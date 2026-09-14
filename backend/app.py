@@ -1,6 +1,7 @@
 from flask import Flask, request
 from flask_cors import CORS
 import pandas as pd
+from sklearn.ensemble import IsolationForest
 
 app=Flask(__name__)
 
@@ -40,13 +41,36 @@ def upload_csv():
         for column, value in df.isnull().sum().items()
     }
 
+    #Find numeric columns
+    numeric_columns=df.select_dtypes(include="number").columns.tolist()
+
+    #Detect anomalies
+    anomaly_count=0
+
+    if len(numeric_columns)>=1:
+        numeric_data=df[numeric_columns].copy()
+
+        #Handle missing numeric values
+
+        numeric_data=numeric_data.fillna(numeric_data.median())
+
+        model=IsolationForest(
+            contamination="auto",
+            random_state=42
+        )
+
+        predictions=model.fit_predict(numeric_data)
+
+        anomaly_count=int((predictions == -1).sum())
+
     return {
         "message": "CSV analyzed successfully!",
         "file": file.filename,
         "rows": rows,
         "columns": columns,
         "column_names": column_names,
-        "missing_values": missing_values
+        "missing_values": missing_values,
+        "numeric_count":anomaly_count
     }
 if __name__=="__main__":
     app.run(debug=True)
