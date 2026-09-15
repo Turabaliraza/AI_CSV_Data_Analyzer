@@ -17,6 +17,20 @@ function App() {
   const [analysis, setAnalysis] = useState(null);
   const [message, setMessage] = useState("");
   const [selectedChartColumn, setSelectedChartColumn]=useState("");
+  const [activeSection, setActiveSection]=useState("dashboard");
+
+  const handleNavigation=(sectionId)=>{
+    setActiveSection(sectionId);
+
+    const section=document.getElementById(sectionId);
+
+    if(section){
+      section.scrollIntoView({
+        behavior:"smooth",
+        block:"start",
+      });
+    }
+  };
 
   const handleFileChange = (event) => {
     setFile(event.target.files[0]);
@@ -76,44 +90,67 @@ function App() {
           </div>
         </div>
 
-        <nav className="sidebar-nav">
+       <nav className="sidebar-nav">
 
-          <div className="nav-item active">
-            <span>⌂</span>
-            Dashboard
-          </div>
+        <button
+         className={`nav-item ${
+           activeSection==="dashboard"?"active":""
+         }`}
+         onClick={() => handleNavigation("dashboard")}
+        >
+          <span>⌂</span>
+          Dashboard
+        </button>
+        <button 
+           className={`nav-item ${
+            activeSection==="upload"?"active":""
+           }`}
+           onClick={()=>handleNavigation("upload")}
+        >
+          <span>↑</span>
+          Upload &amp; Anaylze
+        </button>
 
-          <div className="nav-item">
-            <span>↑</span>
-            Upload & Analyze
-          </div>
-
-          <div className="nav-item">
+        <button 
+          className={`nav-item ${
+            activeSection === "overview"?"active":""
+          }`}
+          onClick={()=>handleNavigation("overview")}
+          >
             <span>▤</span>
             Dataset Overview
-          </div>
+          </button>
 
-          <div className="nav-item">
+          <button 
+            className={`nav-item ${
+              activeSection==="statistics"?"active":""
+            }`}
+            onClick={()=>handleNavigation("statistics")}
+          >
             <span>▥</span>
             Statistics
-          </div>
+          </button>
 
-          <div className="nav-item">
-            <span>◔</span>
-            Visualizations
-          </div>
-
-          <div className="nav-item">
+          <button 
+            className={`nav-item ${
+              activeSection==="ai-analysis"?"active":""
+            }`}
+            onClick={()=>handleNavigation("ai-analysis")}
+          >
             <span>✦</span>
             AI Analysis
-          </div>
+          </button>
 
-          <div className="nav-item">
+          <button
+            className={`nav-item ${
+              activeSection==="anomalies"?"active":""
+            }`}
+            onClick={()=>handleNavigation("anomalies")}
+          >
             <span>⚠</span>
             Anomalies
-          </div>
-
-        </nav>
+          </button>
+       </nav>
 
         <div className="sidebar-bottom">
 
@@ -137,7 +174,7 @@ function App() {
 
 
       {/* ================= MAIN CONTENT ================= */}
-      <main className="main-content">
+      <main className="main-content" id="dashboard">
 
         {/* HEADER */}
         <header className="top-header">
@@ -176,7 +213,7 @@ function App() {
 
 
         {/* ================= UPLOAD SECTION ================= */}
-        <section className="upload-section">
+        <section className="upload-section" id="upload">
 
           <div className="upload-card">
 
@@ -353,7 +390,7 @@ function App() {
             <section className="two-column-grid">
 
               {/* DATASET OVERVIEW */}
-              <div className="dashboard-card">
+              <div className="dashboard-card"id="overview">
 
                 <div className="card-header">
 
@@ -411,7 +448,7 @@ function App() {
 
 
               {/* STATISTICS */}
-              <div className="dashboard-card">
+              <div className="dashboard-card" id="statistics">
 
                 <div className="card-header">
 
@@ -467,7 +504,7 @@ function App() {
   analysis.preview.length > 0 &&
   analysis.numeric_columns &&
   analysis.numeric_columns.length > 0 && (
-    <section className="dashboard-card chart-card">
+    <section className="dashboard-card chart-card" id="visualizations">
 
       <div className="card-header">
 
@@ -588,7 +625,7 @@ function App() {
             {/* ================= ANOMALY SECTION ================= */}
             <section className="two-column-grid bottom-grid">
 
-              <div className="dashboard-card anomaly-card">
+              <div className="dashboard-card anomaly-card" id="ai-analysis">
 
                 <div className="card-header">
 
@@ -654,7 +691,7 @@ function App() {
 
                 {analysis.anomalous_rows.length > 0 ? (
 
-                  <div className="table-wrapper">
+                  <div className="table-wrapper" id="anomalies">
 
                     <table className="modern-table anomaly-table">
 
