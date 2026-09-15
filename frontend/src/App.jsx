@@ -16,11 +16,13 @@ function App() {
   const [file, setFile] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [message, setMessage] = useState("");
+  const [selectedChartColumn, setSelectedChartColumn]=useState("");
 
   const handleFileChange = (event) => {
     setFile(event.target.files[0]);
     setAnalysis(null);
     setMessage("");
+    setSelectedChartColumn("");
   };
 
   const handleUpload = () => {
@@ -43,6 +45,14 @@ function App() {
         } else {
           setMessage(data.message);
           setAnalysis(data);
+
+        if(data.numeric_columns && data.numeric_columns.length>0)
+        {
+          setSelectedChartColumn(data.numeric_columns[0]);
+        }
+        else{
+          setSelectedChartColumn("");
+        }
         }
       })
       .catch((error) => {
@@ -452,103 +462,129 @@ function App() {
               </div>
 
             </section>
+            {/* ================= DYNAMIC CHART ================= */}
+{analysis.preview &&
+  analysis.preview.length > 0 &&
+  analysis.numeric_columns &&
+  analysis.numeric_columns.length > 0 && (
+    <section className="dashboard-card chart-card">
 
+      <div className="card-header">
 
-            {/* ================= CHART ================= */}
-            {analysis.data && (
-              <section className="dashboard-card chart-card">
+        <div className="section-icon purple-icon">
+          ▥
+        </div>
 
-                <div className="card-header">
+        <div>
+          <h2>
+            {selectedChartColumn
+              ? `${selectedChartColumn} Distribution`
+              : "Data Visualization"}
+          </h2>
 
-                  <div className="section-icon purple-icon">
-                    ▥
-                  </div>
+          <p>
+            Visualization of a numeric column from your dataset
+          </p>
+        </div>
 
-                  <div>
-                    <h2>Salary by Employee</h2>
-                    <p>Visualization of employee salary data</p>
-                  </div>
+        <div className="chart-type">
 
-                  <div className="chart-type">
-                    Bar Chart ▾
-                  </div>
+          <select
+            value={selectedChartColumn}
+            onChange={(event) =>
+              setSelectedChartColumn(event.target.value)
+            }
+          >
 
-                </div>
+            {analysis.numeric_columns.map((column) => (
+              <option
+                key={column}
+                value={column}
+              >
+                {column}
+              </option>
+            ))}
 
+          </select>
 
-                <div className="chart-container">
+        </div>
 
-                  <ResponsiveContainer
-                    width="100%"
-                    height={350}
-                  >
+      </div>
 
-                    <BarChart data={analysis.data}>
+      <div className="chart-container">
 
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="rgba(255,255,255,0.08)"
-                      />
+        <ResponsiveContainer
+          width="100%"
+          height={350}
+        >
 
-                      <XAxis
-                        dataKey="Name"
-                        stroke="#9ca3af"
-                      />
+          <BarChart
+            data={analysis.preview}
+          >
 
-                      <YAxis
-                        stroke="#9ca3af"
-                      />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="rgba(255,255,255,0.08)"
+            />
 
-                      <Tooltip
-                        contentStyle={{
-                          background: "#151a2b",
-                          border: "1px solid rgba(255,255,255,0.15)",
-                          borderRadius: "12px",
-                          color: "#ffffff",
-                        }}
-                      />
+            <XAxis
+              dataKey={analysis.column_names[0]}
+              stroke="#9ca3af"
+            />
 
-                      <Legend />
+            <YAxis
+              stroke="#9ca3af"
+            />
 
-                      <Bar
-                        dataKey="Salary"
-                        fill="url(#barGradient)"
-                        radius={[8, 8, 0, 0]}
-                      />
+            <Tooltip
+              contentStyle={{
+                background: "#151a2b",
+                border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: "12px",
+                color: "#ffffff",
+              }}
+            />
 
-                      <defs>
+            <Legend />
 
-                        <linearGradient
-                          id="barGradient"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor="#a855f7"
-                          />
+            <Bar
+              dataKey={selectedChartColumn}
+              fill="url(#barGradient)"
+              radius={[8, 8, 0, 0]}
+            />
 
-                          <stop
-                            offset="100%"
-                            stopColor="#3b82f6"
-                          />
+            <defs>
 
-                        </linearGradient>
+              <linearGradient
+                id="barGradient"
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
 
-                      </defs>
+                <stop
+                  offset="0%"
+                  stopColor="#a855f7"
+                />
 
-                    </BarChart>
+                <stop
+                  offset="100%"
+                  stopColor="#3b82f6"
+                />
 
-                  </ResponsiveContainer>
+              </linearGradient>
 
-                </div>
+            </defs>
 
-              </section>
-            )}
+          </BarChart>
 
+        </ResponsiveContainer>
 
+      </div>
+
+    </section>
+  )}
             {/* ================= ANOMALY SECTION ================= */}
             <section className="two-column-grid bottom-grid">
 
