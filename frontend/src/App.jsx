@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -6,8 +6,6 @@ import {
   Navigate,
   NavLink,
 } from "react-router-dom";
-
-import "./App.css";
 
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
@@ -17,549 +15,399 @@ import Visualizations from "./pages/Visualizations";
 import AIAnalysis from "./pages/AIAnalysis";
 import Anomalies from "./pages/Anomalies";
 
+import "./App.css";
 
 function App() {
-
-  // =========================================================
-  // BASIC APPLICATION STATE
-  // =========================================================
-
-  const [file, setFile] = useState(null);
-
-  const [analysis, setAnalysis] = useState(null);
-
-  const [message, setMessage] = useState("");
-
-  const [selectedChartColumn, setSelectedChartColumn] =
-    useState("");
-
-
-  // =========================================================
-  // CSV ANALYSIS HISTORY
-  // =========================================================
-  // Load previously saved analysis history from localStorage.
-  // This allows the history to remain after page refresh.
-  // =========================================================
-
+  /*
+    ---------------------------------------------------------
+    Load dataset history safely from localStorage
+    ---------------------------------------------------------
+  */
   const [datasetHistory, setDatasetHistory] = useState(() => {
+    try {
+      const savedHistory = localStorage.getItem("csvAnalysisHistory");
 
-    const savedHistory = localStorage.getItem(
-      "csvAnalysisHistory"
-    );
+      if (!savedHistory) {
+        return [];
+      }
 
-    return savedHistory
-      ? JSON.parse(savedHistory)
-      : [];
+      const parsedHistory = JSON.parse(savedHistory);
 
+      return Array.isArray(parsedHistory) ? parsedHistory : [];
+    } catch (error) {
+      console.error("Could not load CSV analysis history:", error);
+      return [];
+    }
   });
 
+  /*
+    ---------------------------------------------------------
+    Restore the previously selected dataset
+    ---------------------------------------------------------
+  */
+  const [selectedDataset, setSelectedDataset] = useState(() => {
+    try {
+      const savedSelectedId = localStorage.getItem(
+        "selectedCsvDatasetId"
+      );
 
-  // =========================================================
-  // CURRENTLY SELECTED DATASET
-  // =========================================================
+      if (!savedSelectedId) {
+        return null;
+      }
 
-  const [selectedDataset, setSelectedDataset] =
-    useState(null);
+      const savedHistory = localStorage.getItem(
+        "csvAnalysisHistory"
+      );
 
+      if (!savedHistory) {
+        return null;
+      }
 
-  // =========================================================
-  // FILE SELECTION
-  // =========================================================
+      const parsedHistory = JSON.parse(savedHistory);
 
-  const handleFileChange = (event) => {
+      if (!Array.isArray(parsedHistory)) {
+        return null;
+      }
 
-    const selectedFile = event.target.files[0];
+      const dataset = parsedHistory.find(
+        (item) => item.id === savedSelectedId
+      );
 
-    if (!selectedFile) {
+      return dataset || null;
+    } catch (error) {
+      console.error(
+        "Could not restore selected dataset:",
+        error
+      );
+
+      return null;
+    }
+  });
+
+  /*
+    ---------------------------------------------------------
+    Current uploaded file
+    ---------------------------------------------------------
+  */
+  const [file, setFile] = useState(null);
+
+  /*
+    ---------------------------------------------------------
+    Current analysis
+    ---------------------------------------------------------
+  */
+  const [analysis, setAnalysis] = useState(() => {
+    try {
+      const savedSelectedId = localStorage.getItem(
+        "selectedCsvDatasetId"
+      );
+
+      const savedHistory = localStorage.getItem(
+        "csvAnalysisHistory"
+      );
+
+      if (!savedSelectedId || !savedHistory) {
+        return null;
+      }
+
+      const parsedHistory = JSON.parse(savedHistory);
+
+      if (!Array.isArray(parsedHistory)) {
+        return null;
+      }
+
+      const dataset = parsedHistory.find(
+        (item) => item.id === savedSelectedId
+      );
+
+      return dataset?.analysis || null;
+    } catch (error) {
+      console.error(
+        "Could not restore selected analysis:",
+        error
+      );
+
+      return null;
+    }
+  });
+
+  /*
+    ---------------------------------------------------------
+    Status / upload message
+    ---------------------------------------------------------
+  */
+  const [message, setMessage] = useState("");
+
+  /*
+    ---------------------------------------------------------
+    Helper: save selected dataset ID
+    ---------------------------------------------------------
+  */
+  const saveSelectedDataset = (dataset) => {
+    setSelectedDataset(dataset);
+
+    if (dataset?.id) {
+      localStorage.setItem(
+        "selectedCsvDatasetId",
+        dataset.id
+      );
+    } else {
+      localStorage.removeItem("selectedCsvDatasetId");
+    }
+  };
+
+  /*
+    ---------------------------------------------------------
+    Analyze / load CSV
+    ---------------------------------------------------------
+  */
+  const handleUpload = async () => {
+    if (!file) {
+      setMessage("Please select a CSV file first.");
       return;
     }
 
-    setFile(selectedFile);
+    /*
+      -------------------------------------------------------
+      Generate a dataset identity using filename + file size
+      -------------------------------------------------------
+    */
+    const datasetId = `${file.name}-${file.size}`;
 
-    setAnalysis(null);
+    /*
+      -------------------------------------------------------
+      Check local history BEFORE sending anything to Flask
+      -------------------------------------------------------
+    */
+    const existingDataset = datasetHistory.find(
+      (dataset) =>
+        dataset.id === datasetId ||
+        (
+          dataset.fileName === file.name &&
+          dataset.fileSize === file.size
+        )
+    );
 
-    setMessage("");
+    /*
+      -------------------------------------------------------
+      Existing CSV
+      -------------------------------------------------------
+    */
+    if (existingDataset) {
+      setAnalysis(existingDataset.analysis);
 
-    setSelectedChartColumn("");
-
-  };
-
-
-  // =========================================================
-  // CSV UPLOAD + ANALYSIS
-  // =========================================================
-
-  const handleUpload = () => {
-
-    // -------------------------------------------------------
-    // Make sure a file was selected
-    // -------------------------------------------------------
-
-    if (!file) {
+      saveSelectedDataset(existingDataset);
 
       setMessage(
-        "Please select a CSV file first."
+        "This CSV has already been analyzed. Loaded the saved analysis."
       );
 
       return;
-
     }
 
-
-    // -------------------------------------------------------
-    // Prepare form data
-    // -------------------------------------------------------
-
+    /*
+      -------------------------------------------------------
+      New CSV
+      -------------------------------------------------------
+    */
     const formData = new FormData();
+    formData.append("file", file);
 
-    formData.append(
-      "file",
-      file
-    );
+    try {
+      setMessage("Analyzing CSV...");
 
-
-    // -------------------------------------------------------
-    // Send CSV to Flask backend
-    // -------------------------------------------------------
-
-    fetch(
-      "http://127.0.0.1:5000/api/upload",
-      {
-        method: "POST",
-        body: formData,
-      }
-    )
-
-      .then((response) => response.json())
-
-      .then((data) => {
-
-        // ===================================================
-        // BACKEND ERROR
-        // ===================================================
-
-        if (data.error) {
-
-          setMessage(
-            data.error
-          );
-
-          return;
-
+      const response = await fetch(
+        "http://localhost:5000/api/upload",
+        {
+          method: "POST",
+          body: formData,
         }
+      );
 
+      const data = await response.json();
 
-        // ===================================================
-        // SUCCESS
-        // ===================================================
+      if (!response.ok) {
+        setMessage(data.error || "Upload failed.");
+        return;
+      }
 
-        setMessage(
-          data.message
+      /*
+        -----------------------------------------------------
+        Create saved dataset object
+        -----------------------------------------------------
+      */
+      const dataset = {
+        id: datasetId,
+        fileName: data.file,
+        fileSize: file.size,
+        analysis: data,
+        analyzedAt: new Date().toISOString(),
+      };
+
+      /*
+        -----------------------------------------------------
+        Save analysis in React state
+        -----------------------------------------------------
+      */
+      setAnalysis(data);
+
+      /*
+        -----------------------------------------------------
+        Update dataset history
+        -----------------------------------------------------
+      */
+      setDatasetHistory((previousHistory) => {
+        const existingDataset = previousHistory.find(
+          (item) =>
+            item.id === dataset.id ||
+            (
+              item.fileName === dataset.fileName &&
+              item.fileSize === dataset.fileSize
+            )
         );
 
-
-        // ===================================================
-        // CREATE DATASET HISTORY OBJECT
-        // ===================================================
-
-        const dataset = {
-
-          id: crypto.randomUUID(),
-
-          fileName: file.name,
-
-          fileSize: file.size,
-
-          uploadedAt: new Date().toISOString(),
-
-          analysis: data,
-
-        };
-
-
-        // ===================================================
-        // CHECK WHETHER THIS CSV ALREADY EXISTS
-        // ===================================================
-
-        const existingDataset =
-          datasetHistory.find(
-            (item) =>
-              item.fileName === file.name &&
-              item.fileSize === file.size
-          );
-
-
-        // ===================================================
-        // EXISTING DATASET
-        // ===================================================
+        let updatedHistory;
 
         if (existingDataset) {
-
-          // Select the existing dataset
-          setSelectedDataset(
-            existingDataset
+          updatedHistory = previousHistory.map((item) =>
+            item.id === existingDataset.id
+              ? dataset
+              : item
           );
-
-
-          // Reuse the existing analysis
-          setAnalysis(
-            existingDataset.analysis
-          );
-
-
-          // Set first numeric column for charts
-          if (
-            existingDataset.analysis.numeric_columns &&
-            existingDataset.analysis.numeric_columns.length > 0
-          ) {
-
-            setSelectedChartColumn(
-              existingDataset.analysis.numeric_columns[0]
-            );
-
-          }
-          else {
-
-            setSelectedChartColumn("");
-
-          }
-
-
-          return;
-
+        } else {
+          updatedHistory = [
+            dataset,
+            ...previousHistory,
+          ];
         }
 
-
-        // ===================================================
-        // NEW DATASET
-        // ===================================================
-
-        const updatedHistory = [
-          dataset,
-          ...datasetHistory,
-        ];
-
-
-        // ---------------------------------------------------
-        // Update React state
-        // ---------------------------------------------------
-
-        setDatasetHistory(
-          updatedHistory
-        );
-
-
-        // ---------------------------------------------------
-        // Save history in browser
-        // ---------------------------------------------------
-
-        localStorage.setItem(
-          "csvAnalysisHistory",
-          JSON.stringify(
-            updatedHistory
-          )
-        );
-
-
-        // ---------------------------------------------------
-        // Select newly uploaded dataset
-        // ---------------------------------------------------
-
-        setSelectedDataset(
-          dataset
-        );
-
-
-        // ---------------------------------------------------
-        // Store analysis
-        // ---------------------------------------------------
-
-        setAnalysis(
-          data
-        );
-
-
-        // ---------------------------------------------------
-        // Select first numeric column for visualization
-        // ---------------------------------------------------
-
-        if (
-          data.numeric_columns &&
-          data.numeric_columns.length > 0
-        ) {
-
-          setSelectedChartColumn(
-            data.numeric_columns[0]
+        try {
+          localStorage.setItem(
+            "csvAnalysisHistory",
+            JSON.stringify(updatedHistory)
           );
-
+        } catch (error) {
+          console.error(
+            "Could not save CSV analysis history:",
+            error
+          );
         }
-        else {
 
-          setSelectedChartColumn("");
-
-        }
-
-      })
-
-
-      // =====================================================
-      // CONNECTION ERROR
-      // =====================================================
-
-      .catch((error) => {
-
-        console.error(
-          "Upload error:",
-          error
-        );
-
-        setMessage(
-          "Error connecting to Flask."
-        );
-
+        return updatedHistory;
       });
 
+      /*
+        -----------------------------------------------------
+        Select the newly analyzed dataset
+        -----------------------------------------------------
+      */
+      saveSelectedDataset(dataset);
+
+      setMessage("CSV analyzed successfully!");
+
+    } catch (error) {
+      console.error("CSV analysis error:", error);
+
+      setMessage(
+        "Could not connect to backend."
+      );
+    }
   };
 
-
-  // =========================================================
-  // APPLICATION LAYOUT
-  // =========================================================
-
   return (
-
     <BrowserRouter>
-
       <div className="app">
-
 
         {/* =================================================
             SIDEBAR
         ================================================= */}
-
         <aside className="sidebar">
 
-
-          {/* -------------------------------------------------
-              BRAND
-          ------------------------------------------------- */}
-
-          <div className="brand">
+          <div className="sidebar-brand">
 
             <div className="brand-icon">
-              ▥
+              AI
             </div>
 
             <div>
-
-              <h2>
-                AI CSV
-              </h2>
-
+              <h2>CSV Analyzer</h2>
               <span>
-                Data Analyzer
+                Intelligent Data Analysis
               </span>
-
             </div>
 
           </div>
 
 
-          {/* -------------------------------------------------
-              NAVIGATION
-          ------------------------------------------------- */}
-
           <nav className="sidebar-nav">
-
-
-            {/* DASHBOARD */}
 
             <NavLink
               to="/dashboard"
-              className={({ isActive }) =>
-                `nav-item ${
-                  isActive ? "active" : ""
-                }`
-              }
+              className="nav-item"
             >
-
-              <span>
-                ⌂
-              </span>
-
               Dashboard
-
             </NavLink>
-
-
-            {/* UPLOAD CSV */}
 
             <NavLink
               to="/upload"
-              className={({ isActive }) =>
-                `nav-item ${
-                  isActive ? "active" : ""
-                }`
-              }
+              className="nav-item"
             >
-
-              <span>
-                ↑
-              </span>
-
               Upload CSV
-
             </NavLink>
-
-
-            {/* OVERVIEW */}
 
             <NavLink
               to="/overview"
-              className={({ isActive }) =>
-                `nav-item ${
-                  isActive ? "active" : ""
-                }`
-              }
+              className="nav-item"
             >
-
-              <span>
-                ▤
-              </span>
-
               Overview
-
             </NavLink>
-
-
-            {/* STATISTICS */}
 
             <NavLink
               to="/statistics"
-              className={({ isActive }) =>
-                `nav-item ${
-                  isActive ? "active" : ""
-                }`
-              }
+              className="nav-item"
             >
-
-              <span>
-                ▥
-              </span>
-
               Statistics
-
             </NavLink>
-
-
-            {/* VISUALIZATIONS */}
 
             <NavLink
               to="/visualizations"
-              className={({ isActive }) =>
-                `nav-item ${
-                  isActive ? "active" : ""
-                }`
-              }
+              className="nav-item"
             >
-
-              <span>
-                ▥
-              </span>
-
               Visualizations
-
             </NavLink>
-
-
-            {/* AI ANALYSIS */}
 
             <NavLink
               to="/ai-analysis"
-              className={({ isActive }) =>
-                `nav-item ${
-                  isActive ? "active" : ""
-                }`
-              }
+              className="nav-item"
             >
-
-              <span>
-                ✦
-              </span>
-
               AI Analysis
-
             </NavLink>
-
-
-            {/* ANOMALIES */}
 
             <NavLink
               to="/anomalies"
-              className={({ isActive }) =>
-                `nav-item ${
-                  isActive ? "active" : ""
-                }`
-              }
+              className="nav-item"
             >
-
-              <span>
-                ⚠
-              </span>
-
               Anomalies
-
             </NavLink>
 
+            <div className="nav-item">
+              Settings
+            </div>
 
           </nav>
 
 
-          {/* =================================================
-              SIDEBAR BOTTOM
-          ================================================= */}
+          <div className="sidebar-footer">
 
-          <div className="sidebar-bottom">
+            <span>
+              Universal CSV Analyzer
+            </span>
 
-
-            {/* PROFILE */}
-
-            <div className="profile">
-
-              <div className="profile-avatar">
-                T
-              </div>
-
-              <div>
-
-                <strong>
-                  AI CSV Analyzer
-                </strong>
-
-                <span>
-                  Analytics Platform
-                </span>
-
-              </div>
-
-            </div>
-
-
-            {/* SETTINGS */}
-
-            <div className="nav-item">
-
-              <span>
-                ⚙
-              </span>
-
-              Settings
-
-            </div>
-
+            <span>
+              Python • Flask • React • AI
+            </span>
 
           </div>
-
 
         </aside>
 
@@ -567,17 +415,13 @@ function App() {
         {/* =================================================
             MAIN CONTENT
         ================================================= */}
-
         <main className="main-content">
 
-
           <Routes>
-
 
             {/* =================================================
                 DASHBOARD
             ================================================= */}
-
             <Route
               path="/dashboard"
               element={
@@ -594,16 +438,17 @@ function App() {
 
 
             {/* =================================================
-                UPLOAD / CSV HISTORY
+                UPLOAD / HISTORY
             ================================================= */}
-
             <Route
               path="/upload"
               element={
                 <Upload
                   datasetHistory={datasetHistory}
                   selectedDataset={selectedDataset}
-                  setSelectedDataset={setSelectedDataset}
+                  setSelectedDataset={(dataset) => {
+                    saveSelectedDataset(dataset);
+                  }}
                   setAnalysis={setAnalysis}
                 />
               }
@@ -611,9 +456,8 @@ function App() {
 
 
             {/* =================================================
-                DATASET OVERVIEW
+                OVERVIEW
             ================================================= */}
-
             <Route
               path="/overview"
               element={
@@ -628,7 +472,6 @@ function App() {
             {/* =================================================
                 STATISTICS
             ================================================= */}
-
             <Route
               path="/statistics"
               element={
@@ -643,7 +486,6 @@ function App() {
             {/* =================================================
                 VISUALIZATIONS
             ================================================= */}
-
             <Route
               path="/visualizations"
               element={
@@ -658,7 +500,6 @@ function App() {
             {/* =================================================
                 AI ANALYSIS
             ================================================= */}
-
             <Route
               path="/ai-analysis"
               element={
@@ -673,7 +514,6 @@ function App() {
             {/* =================================================
                 ANOMALIES
             ================================================= */}
-
             <Route
               path="/anomalies"
               element={
@@ -688,7 +528,6 @@ function App() {
             {/* =================================================
                 DEFAULT ROUTE
             ================================================= */}
-
             <Route
               path="*"
               element={
@@ -699,19 +538,13 @@ function App() {
               }
             />
 
-
           </Routes>
-
 
         </main>
 
-
       </div>
-
     </BrowserRouter>
-
   );
 }
-
 
 export default App;
