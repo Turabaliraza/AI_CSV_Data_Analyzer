@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -23,66 +23,87 @@ function App() {
     Load dataset history safely from localStorage
     ---------------------------------------------------------
   */
-  const [datasetHistory, setDatasetHistory] = useState(() => {
-    try {
-      const savedHistory = localStorage.getItem("csvAnalysisHistory");
+  const [datasetHistory, setDatasetHistory] = useState([]);
 
-      if (!savedHistory) {
-        return [];
+  /*
+    ---------------------------------------------------------
+    Load dataset history from MongoDB
+    ---------------------------------------------------------
+  */
+
+  useEffect(() => {
+    const loadDatasets = async () => {
+      try {
+        const response = await fetch(
+          "http://localhost:5000/api/datasets"
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || "Could not load datasets."
+          );
+        }
+
+        const mongoDatasets = data
+          .map((document) => ({
+            id: document._id,
+            fileName: document.file,
+            fileSize: document.file_size ?? null,
+            fileHash: document.file_hash ?? null,
+            analysis: document,
+            analyzedAt: document.created_at,
+          }))
+          .filter(
+            (dataset, index, history) =>
+              dataset.fileHash
+                ? history.findIndex(
+                    (item) => item.fileHash === dataset.fileHash
+                  ) === index
+                : history.findIndex(
+                    (item) => item.id === dataset.id
+                  ) === index
+          );
+
+        setDatasetHistory(mongoDatasets);
+
+        // MongoDB is the source of truth. The old localStorage
+        // history is no longer used for dataset records.
+        localStorage.removeItem("csvAnalysisHistory");
+
+        const savedSelectedId = localStorage.getItem(
+          "selectedCsvDatasetId"
+        );
+
+        if (savedSelectedId) {
+          const selected = mongoDatasets.find(
+            (item) => item.id === savedSelectedId
+          );
+
+          if (selected) {
+            setSelectedDataset(selected);
+            setAnalysis(selected.analysis);
+          } else {
+            localStorage.removeItem("selectedCsvDatasetId");
+          }
+        }
+      } catch (error) {
+        console.error(
+          "Could not load datasets from MongoDB:",
+          error
+        );
       }
+    };
 
-      const parsedHistory = JSON.parse(savedHistory);
-
-      return Array.isArray(parsedHistory) ? parsedHistory : [];
-    } catch (error) {
-      console.error("Could not load CSV analysis history:", error);
-      return [];
-    }
-  });
-
+    loadDatasets();
+  }, []);
   /*
     ---------------------------------------------------------
     Restore the previously selected dataset
     ---------------------------------------------------------
   */
-  const [selectedDataset, setSelectedDataset] = useState(() => {
-    try {
-      const savedSelectedId = localStorage.getItem(
-        "selectedCsvDatasetId"
-      );
-
-      if (!savedSelectedId) {
-        return null;
-      }
-
-      const savedHistory = localStorage.getItem(
-        "csvAnalysisHistory"
-      );
-
-      if (!savedHistory) {
-        return null;
-      }
-
-      const parsedHistory = JSON.parse(savedHistory);
-
-      if (!Array.isArray(parsedHistory)) {
-        return null;
-      }
-
-      const dataset = parsedHistory.find(
-        (item) => item.id === savedSelectedId
-      );
-
-      return dataset || null;
-    } catch (error) {
-      console.error(
-        "Could not restore selected dataset:",
-        error
-      );
-
-      return null;
-    }
-  });
+  const [selectedDataset, setSelectedDataset] = useState(null);
 
   /*
     ---------------------------------------------------------
@@ -96,40 +117,7 @@ function App() {
     Current analysis
     ---------------------------------------------------------
   */
-  const [analysis, setAnalysis] = useState(() => {
-    try {
-      const savedSelectedId = localStorage.getItem(
-        "selectedCsvDatasetId"
-      );
-
-      const savedHistory = localStorage.getItem(
-        "csvAnalysisHistory"
-      );
-
-      if (!savedSelectedId || !savedHistory) {
-        return null;
-      }
-
-      const parsedHistory = JSON.parse(savedHistory);
-
-      if (!Array.isArray(parsedHistory)) {
-        return null;
-      }
-
-      const dataset = parsedHistory.find(
-        (item) => item.id === savedSelectedId
-      );
-
-      return dataset?.analysis || null;
-    } catch (error) {
-      console.error(
-        "Could not restore selected analysis:",
-        error
-      );
-
-      return null;
-    }
-  });
+  const [analysis, setAnalysis] = useState(null);
 
   /*
     ---------------------------------------------------------
@@ -168,47 +156,9 @@ function App() {
     }
 
     /*
-      -------------------------------------------------------
-      Generate a dataset identity using filename + file size
-      -------------------------------------------------------
-    */
-    const datasetId = `${file.name}-${file.size}`;
-
-    /*
-      -------------------------------------------------------
-      Check local history BEFORE sending anything to Flask
-      -------------------------------------------------------
-    */
-    const existingDataset = datasetHistory.find(
-      (dataset) =>
-        dataset.id === datasetId ||
-        (
-          dataset.fileName === file.name &&
-          dataset.fileSize === file.size
-        )
-    );
-
-    /*
-      -------------------------------------------------------
-      Existing CSV
-      -------------------------------------------------------
-    */
-    if (existingDataset) {
-      setAnalysis(existingDataset.analysis);
-
-      saveSelectedDataset(existingDataset);
-
-      setMessage(
-        "This CSV has already been analyzed. Loaded the saved analysis."
-      );
-
-      return;
-    }
-
-    /*
-      -------------------------------------------------------
-      New CSV
-      -------------------------------------------------------
+      MongoDB is the source of truth for dataset identity.
+      The backend calculates the SHA-256 hash and decides
+      whether this file is new or already stored.
     */
     const formData = new FormData();
     formData.append("file", file);
@@ -232,78 +182,47 @@ function App() {
       }
 
       /*
-        -----------------------------------------------------
-        Create saved dataset object
-        -----------------------------------------------------
+        The backend always returns the MongoDB document,
+        including its stable _id, file_hash and created_at.
       */
+      if (!data._id) {
+        console.error("Backend response is missing MongoDB _id:", data);
+        setMessage("Backend returned an invalid dataset response.");
+        return;
+      }
+
       const dataset = {
-        id: datasetId,
+        id: data._id,
         fileName: data.file,
-        fileSize: file.size,
+        fileSize: data.file_size ?? file.size,
+        fileHash: data.file_hash ?? null,
         analysis: data,
-        analyzedAt: new Date().toISOString(),
+        analyzedAt: data.created_at,
       };
 
-      /*
-        -----------------------------------------------------
-        Save analysis in React state
-        -----------------------------------------------------
-      */
       setAnalysis(data);
-
-      /*
-        -----------------------------------------------------
-        Update dataset history
-        -----------------------------------------------------
-      */
-      setDatasetHistory((previousHistory) => {
-        const existingDataset = previousHistory.find(
-          (item) =>
-            item.id === dataset.id ||
-            (
-              item.fileName === dataset.fileName &&
-              item.fileSize === dataset.fileSize
-            )
-        );
-
-        let updatedHistory;
-
-        if (existingDataset) {
-          updatedHistory = previousHistory.map((item) =>
-            item.id === existingDataset.id
-              ? dataset
-              : item
-          );
-        } else {
-          updatedHistory = [
-            dataset,
-            ...previousHistory,
-          ];
-        }
-
-        try {
-          localStorage.setItem(
-            "csvAnalysisHistory",
-            JSON.stringify(updatedHistory)
-          );
-        } catch (error) {
-          console.error(
-            "Could not save CSV analysis history:",
-            error
-          );
-        }
-
-        return updatedHistory;
-      });
-
-      /*
-        -----------------------------------------------------
-        Select the newly analyzed dataset
-        -----------------------------------------------------
-      */
       saveSelectedDataset(dataset);
 
-      setMessage("CSV analyzed successfully!");
+      /*
+        Update the in-memory history by MongoDB _id.
+        An existing dataset therefore replaces the existing
+        item instead of creating a second history entry.
+      */
+      setDatasetHistory((previousHistory) => {
+        const filteredHistory = previousHistory.filter(
+          (item) =>
+            item.id !== dataset.id &&
+            (!dataset.fileHash || item.fileHash !== dataset.fileHash)
+        );
+
+        return [dataset, ...filteredHistory];
+      });
+
+      setMessage(
+        data.already_analyzed
+          ? "This CSV has already been analyzed. Loaded the saved analysis."
+          : "CSV analyzed successfully!"
+      );
 
     } catch (error) {
       console.error("CSV analysis error:", error);
@@ -331,6 +250,7 @@ function App() {
 
             <div>
               <h2>CSV Analyzer</h2>
+
               <span>
                 Intelligent Data Analysis
               </span>

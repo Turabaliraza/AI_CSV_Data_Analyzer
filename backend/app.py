@@ -1,15 +1,56 @@
 from flask import Flask, request
 from flask_cors import CORS
-
 import pandas as pd
 import math
-
 from sklearn.ensemble import IsolationForest
 
+import os
+import json
+import hashlib 
+from dotenv import load_dotenv
+from pymongo import MongoClient
+from pymongo.errors import DuplicateKeyError
+from datetime import datetime, timezone
+
+
+# =========================================================
+# FLASK + MONGODB SETUP
+# =========================================================
 
 app = Flask(__name__)
-
 CORS(app)
+
+load_dotenv()
+
+MONGO_URI = os.getenv("MONGO_URI")
+
+client = MongoClient(MONGO_URI)
+
+db = client["ai_csv_analyzer"]
+datasets_collection = db["datasets"]
+
+
+# A sparse unique index keeps legacy documents valid while
+# guaranteeing that each new file hash can exist only once.
+try:
+    datasets_collection.create_index(
+        [("file_hash", 1)],
+        unique=True,
+        sparse=True
+    )
+except Exception as error:
+    print("MongoDB index setup warning:", error)
+
+
+# =========================================================
+# MONGODB CONNECTION TEST
+# =========================================================
+
+try:
+    client.admin.command("ping")
+    print("MongoDB connection successful!")
+except Exception as error:
+    print("MongoDB connection failed:", error)
 
 
 # =========================================================
@@ -28,6 +69,80 @@ def clean_value(value):
         return None
 
     return value
+
+
+# =========================================================
+# MONGODB DOCUMENT HELPERS
+# =========================================================
+
+def serialize_mongo_document(document):
+    """Convert a MongoDB dataset document into JSON-safe data."""
+
+    document = dict(document)
+
+    if "_id" in document:
+        document["_id"] = str(document["_id"])
+
+    if isinstance(document.get("created_at"), datetime):
+        document["created_at"] = document["created_at"].isoformat()
+
+    return document
+
+
+LEGACY_MATCH_FIELDS = [
+    "file",
+    "rows",
+    "columns",
+    "column_names",
+    "missing_values",
+    "duplicate_rows",
+    "numeric_columns",
+    "visualization_numeric_columns",
+    "categorical_columns",
+    "boolean_columns",
+    "datetime_columns",
+    "identifier_columns",
+    "anomaly_columns",
+    "column_information",
+    "statistics",
+    "anomaly_status",
+    "anomaly_count",
+    "anomalous_rows",
+    "preview",
+    "visualization_data"
+]
+
+
+def values_match(left, right):
+    """Compare nested analysis values consistently."""
+
+    try:
+        return json.dumps(
+            left,
+            sort_keys=True,
+            default=str,
+            separators=(",", ":")
+        ) == json.dumps(
+            right,
+            sort_keys=True,
+            default=str,
+            separators=(",", ":")
+        )
+    except Exception:
+        return left == right
+
+
+def legacy_analysis_matches(legacy_document, analysis_result):
+    """Match a pre-hash document against the newly generated analysis."""
+
+    for field in LEGACY_MATCH_FIELDS:
+        if not values_match(
+            legacy_document.get(field),
+            analysis_result.get(field)
+        ):
+            return False
+
+    return True
 
 
 # =========================================================
@@ -103,7 +218,6 @@ def calculate_nice_bin_width(
     Calculate a human-readable bin width.
 
     Examples:
-
         47.3 -> 50
         124  -> 200
         0.43 -> 0.5
@@ -257,12 +371,12 @@ def create_numeric_visualization(series):
     # -----------------------------------------------------
     # FINAL POLISH
     # -----------------------------------------------------
-    #
+
     # Keep the number of groups small enough for the
     # X-axis to remain readable.
-    #
+
     # The entire dataset is still used.
-    #
+
     # We are only changing how values are grouped.
 
     target_bins = 10
@@ -307,10 +421,10 @@ def create_numeric_visualization(series):
     # -----------------------------------------------------
     # Safety check
     # -----------------------------------------------------
-    #
+
     # The "nice number" calculation should normally
     # produce around 10 groups.
-    #
+
     # This prevents an unusual dataset from producing
     # too many groups.
 
@@ -715,8 +829,126 @@ def test_api():
             "React and Flask are ready to communicate!"
 
     }
+# =========================================================
+# GET SAVED DATASETS
+# =========================================================
 
+@app.route("/api/datasets", methods=["GET"])
+def get_datasets():
 
+    try:
+
+        documents = datasets_collection.find().sort(
+            "created_at",
+            -1
+        )
+
+        datasets = []
+
+        for document in documents:
+            datasets.append(
+                serialize_mongo_document(document)
+            )
+
+        return datasets
+
+    except Exception as error:
+
+        return {
+            "error":
+                str(error)
+        }, 500
+
+# =========================================================
+# TEMPORARY MIGRATION ENDPOINT
+# =========================================================
+
+@app.route("/api/migrate-dataset", methods=["POST"])
+def migrate_dataset():
+
+    try:
+
+        dataset = request.get_json()
+
+        if not dataset:
+            return {
+                "error": "No dataset provided."
+            }, 400
+
+        analysis = dataset.get("analysis")
+
+        if not analysis:
+            return {
+                "error": "No analysis data provided."
+            }, 400
+
+        file_hash = (
+            dataset.get("file_hash")
+            or dataset.get("fileHash")
+        )
+
+        if not file_hash:
+            return {
+                "error":
+                    "Migration requires a file_hash. Upload the original CSV through /api/upload instead."
+            }, 400
+
+        existing_dataset = datasets_collection.find_one(
+            {"file_hash": file_hash}
+        )
+
+        if existing_dataset:
+            return {
+                "message": "Dataset already exists.",
+                "file": analysis.get("file")
+            }, 200
+
+        mongodb_document = {
+            **analysis,
+            "file_hash": file_hash,
+            "file_size": dataset.get("file_size"),
+            "created_at": dataset.get(
+                "analyzedAt",
+                datetime.now(timezone.utc).isoformat()
+            )
+        }
+
+        try:
+
+            datasets_collection.insert_one(
+                mongodb_document
+            )
+
+        except DuplicateKeyError:
+
+            existing_dataset = datasets_collection.find_one(
+                {"file_hash": file_hash}
+            )
+
+            if existing_dataset:
+
+                existing_response = serialize_mongo_document(
+                    existing_dataset
+                )
+
+                existing_response["already_analyzed"] = True
+                existing_response["message"] = "Dataset already exists. Loaded the saved analysis."
+
+                return existing_response, 200
+
+            raise
+
+        return {
+            "message": "Dataset migrated successfully.",
+            "file": analysis.get("file"),
+            "file_hash": file_hash
+        }, 201
+
+    except Exception as error:
+
+        return {
+            "error": str(error)
+        }, 500  
 # =========================================================
 # CSV UPLOAD AND ANALYSIS
 # =========================================================
@@ -767,6 +999,50 @@ def upload_csv():
                 "Only CSV files are supported"
 
         }, 400
+
+
+    # =================================================
+    # CALCULATE FILE HASH
+    # =================================================
+
+    file_bytes = file.read()
+
+    file_hash = hashlib.sha256(
+        file_bytes
+    ).hexdigest()
+
+    file_size = len(file_bytes)
+
+    file.seek(0)
+
+
+    # =================================================
+    # CHECK MONGODB FOR EXISTING DATASET
+    # =================================================
+
+    existing_dataset = datasets_collection.find_one(
+        {
+            "file_hash":
+                file_hash
+        }
+    )
+
+
+    # =================================================
+    # RETURN EXISTING ANALYSIS
+    # =================================================
+
+    if existing_dataset:
+
+        existing_response = serialize_mongo_document(
+            existing_dataset
+        )
+
+        existing_response["already_analyzed"] = True
+        existing_response["message"] = "Dataset already exists. Loaded the saved analysis."
+
+        return existing_response
+
 
     try:
 
@@ -1038,8 +1314,10 @@ def upload_csv():
             )
 
             numeric_data = (
+
                 numeric_data
                 .fillna(0)
+
             )
 
             # -------------------------------------------------
@@ -1276,10 +1554,10 @@ def upload_csv():
             })
 
         # =================================================
-        # 13. RETURN ANALYSIS
+        # 13. CREATE ANALYSIS RESULT
         # =================================================
 
-        return {
+        analysis_result = {
 
             "message":
                 "CSV analyzed successfully!",
@@ -1348,6 +1626,113 @@ def upload_csv():
                 visualization_data
 
         }
+
+        # =================================================
+        # 14. HANDLE LEGACY DOCUMENTS
+        # =================================================
+        # Older records do not have file_hash. If the newly
+        # generated analysis is identical to a legacy record,
+        # attach the hash to that record instead of inserting
+        # another dataset. This is a one-time compatibility path.
+        # =================================================
+
+        legacy_candidates = datasets_collection.find({
+            "file": file.filename,
+            "file_hash": {"$exists": False}
+        })
+
+        for legacy_document in legacy_candidates:
+
+            if legacy_analysis_matches(
+                legacy_document,
+                analysis_result
+            ):
+
+                datasets_collection.update_one(
+                    {"_id": legacy_document["_id"]},
+                    {
+                        "$set": {
+                            "file_hash": file_hash,
+                            "file_size": file_size
+                        }
+                    }
+                )
+
+                updated_document = datasets_collection.find_one(
+                    {"_id": legacy_document["_id"]}
+                )
+
+                legacy_response = serialize_mongo_document(
+                    updated_document
+                )
+
+                legacy_response["already_analyzed"] = True
+
+                return legacy_response
+
+
+        # =================================================
+        # 15. SAVE NEW ANALYSIS TO MONGODB
+        # =================================================
+
+        mongodb_document = {
+
+            **analysis_result,
+
+            "file_hash":
+                file_hash,
+
+            "file_size":
+                file_size,
+
+            "created_at":
+                datetime.now(timezone.utc)
+
+        }
+
+        try:
+
+            insert_result = datasets_collection.insert_one(
+                mongodb_document
+            )
+
+        except DuplicateKeyError:
+
+            # If two identical CSV uploads arrive at nearly
+            # the same time, the unique MongoDB index prevents
+            # a second document from being created.
+            existing_dataset = datasets_collection.find_one(
+                {"file_hash": file_hash}
+            )
+
+            if existing_dataset:
+
+                existing_response = serialize_mongo_document(
+                    existing_dataset
+                )
+
+                existing_response["already_analyzed"] = True
+                existing_response["message"] = "Dataset already exists. Loaded the saved analysis."
+
+                return existing_response, 200
+
+            raise
+
+        saved_document = datasets_collection.find_one(
+            {"_id": insert_result.inserted_id}
+        )
+
+        # =================================================
+        # 16. RETURN SAVED ANALYSIS TO FRONTEND
+        # =================================================
+
+        new_response = serialize_mongo_document(
+            saved_document
+        )
+
+        new_response["already_analyzed"] = False
+
+        return new_response
 
     # =================================================
     # ERROR HANDLING

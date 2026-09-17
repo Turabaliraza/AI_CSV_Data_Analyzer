@@ -207,13 +207,17 @@ function Visualizations({ analysis, selectedDataset }) {
       return [];
     }
 
-    const rawData =
-      visualizationData.numeric[selectedColumn];
+    const visualization =
+  visualizationData.numeric[selectedColumn];
 
-    if (!Array.isArray(rawData)) {
-      return [];
-    }
+const rawData =
+  Array.isArray(visualization)
+    ? visualization
+    : visualization?.data;
 
+if (!Array.isArray(rawData)) {
+  return [];
+}
     return rawData
       .map((item, index) => {
         const label =
