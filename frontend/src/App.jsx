@@ -5,6 +5,7 @@ import {
   Route,
   Navigate,
   NavLink,
+  useNavigate,
 } from "react-router-dom";
 
 import Login from "./pages/Login";
@@ -34,6 +35,108 @@ const getAuthHeaders = () => {
       }
     : {};
 };
+
+
+/* =========================================================
+   PROTECTED ROUTE
+   ========================================================= */
+
+function ProtectedRoute({ children }) {
+  const token = localStorage.getItem("accessToken");
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
+
+/* =========================================================
+   AUTH ROUTE
+   Prevent logged-in users from opening login/register
+   ========================================================= */
+
+function AuthRoute({ children }) {
+  const token = localStorage.getItem("accessToken");
+
+  if (token) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
+
+
+/* =========================================================
+   SETTINGS PAGE
+   ========================================================= */
+
+function Settings() {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("selectedCsvDatasetId");
+    localStorage.removeItem("SelectedCsvDataset");
+    
+    navigate("/login", { replace: true });
+  };
+
+  return (
+    <div className="page-container">
+
+      <div className="top-header">
+        <div>
+          <h1>
+            Account <span className="gradient-text">Settings</span>
+          </h1>
+
+          <p>
+            Manage your account and application session.
+          </p>
+        </div>
+      </div>
+
+
+      <div className="settings-content">
+
+        <div className="dashboard-card settings-card">
+
+          <div className="card-header">
+            <h2>Account</h2>
+          </div>
+
+          <div className="settings-section">
+
+            <div className="settings-info">
+              <h3>Session</h3>
+
+              <p>
+                You are currently signed in to AI CSV Analyzer.
+              </p>
+            </div>
+
+
+            <button
+              type="button"
+              className="logout-button"
+              onClick={handleLogout}
+            >
+              Logout
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
 
 
 /* =========================================================
@@ -556,9 +659,12 @@ function MainApplication() {
           </NavLink>
 
 
-          <div className="nav-item">
+          <NavLink
+            to="/settings"
+            className="nav-item"
+          >
             Settings
-          </div>
+          </NavLink>
 
 
         </nav>
@@ -790,6 +896,18 @@ function MainApplication() {
 
 
           {/* =================================================
+              SETTINGS
+          ================================================= */}
+
+          <Route
+            path="/settings"
+            element={
+              <Settings />
+            }
+          />
+
+
+          {/* =================================================
               DEFAULT APPLICATION ROUTE
           ================================================= */}
 
@@ -837,7 +955,9 @@ function App() {
         <Route
           path="/login"
           element={
-            <Login />
+            <AuthRoute>
+              <Login />
+            </AuthRoute>
           }
         />
 
@@ -845,7 +965,9 @@ function App() {
         <Route
           path="/register"
           element={
-            <Register />
+            <AuthRoute>
+              <Register />
+            </AuthRoute>
           }
         />
 
@@ -857,7 +979,9 @@ function App() {
         <Route
           path="/*"
           element={
-            <MainApplication />
+            <ProtectedRoute>
+              <MainApplication />
+            </ProtectedRoute>
           }
         />
 

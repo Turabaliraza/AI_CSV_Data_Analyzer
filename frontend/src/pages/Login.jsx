@@ -50,13 +50,23 @@ function Login() {
       }
 
       /*
-        Store authentication information.
-
-        The JWT access token will later be used when
-        communicating with protected backend endpoints.
+        Clear any legacy authentication key
+        from older versions of the application.
       */
-      localStorage.setItem("accessToken", data.access_token);
+      localStorage.removeItem("access_token");
 
+      /*
+        Store the JWT using the application's
+        current authentication key.
+      */
+      localStorage.setItem(
+        "accessToken",
+        data.access_token
+      );
+
+      /*
+        Store the currently authenticated user.
+      */
       if (data.user) {
         localStorage.setItem(
           "currentUser",
@@ -65,19 +75,29 @@ function Login() {
       }
 
       navigate("/dashboard");
+
     } catch (error) {
+
       console.error("Login error:", error);
-      setMessage("Could not connect to backend.");
+
+      setMessage(
+        "Could not connect to backend."
+      );
+
     } finally {
+
       setLoading(false);
+
     }
   };
 
   return (
     <div className="auth-page">
+
       <div className="auth-card">
 
         <div className="auth-brand">
+
           <div className="auth-brand-icon">
             AI
           </div>
@@ -86,18 +106,25 @@ function Login() {
             <h1>CSV Analyzer</h1>
             <p>Intelligent Data Analysis</p>
           </div>
+
         </div>
 
+
         <div className="auth-header">
+
           <h2>Welcome back</h2>
+
           <p>
             Sign in to continue analyzing your datasets.
           </p>
+
         </div>
+
 
         <form onSubmit={handleLogin}>
 
           <div className="auth-field">
+
             <label htmlFor="login-email">
               Email
             </label>
@@ -107,12 +134,17 @@ function Login() {
               type="email"
               placeholder="Enter your email"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) =>
+                setEmail(event.target.value)
+              }
               autoComplete="email"
             />
+
           </div>
 
+
           <div className="auth-field">
+
             <label htmlFor="login-password">
               Password
             </label>
@@ -122,10 +154,14 @@ function Login() {
               type="password"
               placeholder="Enter your password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) =>
+                setPassword(event.target.value)
+              }
               autoComplete="current-password"
             />
+
           </div>
+
 
           {message && (
             <div className="auth-error">
@@ -133,25 +169,34 @@ function Login() {
             </div>
           )}
 
+
           <button
             type="submit"
             className="auth-button"
             disabled={loading}
           >
-            {loading ? "Signing in..." : "Sign In"}
+            {loading
+              ? "Signing in..."
+              : "Sign In"}
           </button>
 
         </form>
 
+
         <div className="auth-footer">
-          <span>Don't have an account?</span>
+
+          <span>
+            Don't have an account?
+          </span>
 
           <Link to="/register">
             Create an account
           </Link>
+
         </div>
 
       </div>
+
     </div>
   );
 }
