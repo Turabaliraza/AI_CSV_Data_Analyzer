@@ -75,69 +75,573 @@ function AuthRoute({ children }) {
 function Settings() {
   const navigate = useNavigate();
 
+  const [remainingSeconds, setRemainingSeconds] = useState(null);
+  const [sessionDuration, setSessionDuration] = useState(null);
+
+  /*
+    ---------------------------------------------------------
+    Get current user
+    ---------------------------------------------------------
+  */
+
+  const getCurrentUser = () => {
+    try {
+      const storedUser = localStorage.getItem("currentUser");
+
+      if (!storedUser) {
+        return null;
+      }
+
+      return JSON.parse(storedUser);
+
+    } catch (error) {
+      console.error(
+        "Could not read current user:",
+        error
+      );
+
+      return null;
+    }
+  };
+
+  const currentUser = getCurrentUser();
+
+
+  /*
+    ---------------------------------------------------------
+    JWT SESSION TIMER
+    ---------------------------------------------------------
+  */
+
+  useEffect(() => {
+    const calculateRemainingTime = () => {
+      const token = localStorage.getItem("accessToken");
+
+      if (!token) {
+        setRemainingSeconds(null);
+        return;
+      }
+
+      try {
+        const tokenParts = token.split(".");
+
+        if (tokenParts.length !== 3) {
+          console.error("Invalid JWT format.");
+          setRemainingSeconds(null);
+          return;
+        }
+
+        const base64Payload = tokenParts[1]
+          .replace(/-/g, "+")
+          .replace(/_/g, "/");
+
+        const payload = JSON.parse(
+          atob(base64Payload)
+        );
+
+        if (!payload.exp) {
+          console.error(
+            "JWT does not contain an expiration time."
+          );
+
+          setRemainingSeconds(null);
+          return;
+        }
+
+        const expirationTime = payload.exp * 1000;
+        const now = Date.now();
+
+        const remaining = Math.max(
+          0,
+          Math.floor(
+            (expirationTime - now) / 1000
+          )
+        );
+
+        setRemainingSeconds(remaining);
+
+
+        /*
+          Calculate actual JWT session duration.
+        */
+
+        if (payload.iat) {
+          const totalDuration = Math.max(
+            1,
+            payload.exp - payload.iat
+          );
+
+          setSessionDuration(totalDuration);
+        }
+
+
+        /*
+          Automatically logout when JWT expires.
+        */
+
+        if (remaining <= 0) {
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("currentUser");
+          localStorage.removeItem("selectedCsvDatasetId");
+          localStorage.removeItem("selectedCsvDataset");
+
+          navigate("/login", {
+            replace: true,
+          });
+        }
+
+      } catch (error) {
+        console.error(
+          "Could not read JWT expiration:",
+          error
+        );
+      }
+    };
+
+
+    calculateRemainingTime();
+
+    const timer = setInterval(
+      calculateRemainingTime,
+      1000
+    );
+
+    return () => clearInterval(timer);
+
+  }, [navigate]);
+
+
+  /*
+    ---------------------------------------------------------
+    Format remaining time
+    ---------------------------------------------------------
+  */
+
+  const formatRemainingTime = () => {
+    if (remainingSeconds === null) {
+      return "--:--";
+    }
+
+    const hours = Math.floor(
+      remainingSeconds / 3600
+    );
+
+    const minutes = Math.floor(
+      (remainingSeconds % 3600) / 60
+    );
+
+    const seconds = remainingSeconds % 60;
+
+
+    if (hours > 0) {
+      return `${String(hours).padStart(2, "0")}:${String(
+        minutes
+      ).padStart(2, "0")}:${String(
+        seconds
+      ).padStart(2, "0")}`;
+    }
+
+
+    return `${String(minutes).padStart(
+      2,
+      "0"
+    )}:${String(seconds).padStart(
+      2,
+      "0"
+    )}`;
+  };
+
+
+  /*
+    ---------------------------------------------------------
+    Session progress
+    ---------------------------------------------------------
+  */
+
+  const getSessionProgress = () => {
+    if (
+      remainingSeconds === null ||
+      sessionDuration === null
+    ) {
+      return 100;
+    }
+
+    return Math.min(
+      100,
+      Math.max(
+        0,
+        (remainingSeconds / sessionDuration) * 100
+      )
+    );
+  };
+
+
+  /*
+    ---------------------------------------------------------
+    Logout
+    ---------------------------------------------------------
+  */
+
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("access_token");
     localStorage.removeItem("currentUser");
     localStorage.removeItem("selectedCsvDatasetId");
-    localStorage.removeItem("SelectedCsvDataset");
-    
-    navigate("/login", { replace: true });
+    localStorage.removeItem("selectedCsvDataset");
+
+    navigate("/login", {
+      replace: true,
+    });
   };
 
-  return (
-    <div className="page-container">
 
-      <div className="top-header">
-        <div>
+  const isSessionWarning =
+    remainingSeconds !== null &&
+    remainingSeconds <= 60;
+
+
+  return (
+    <div className="page-container settings-page">
+
+
+      {/* =====================================================
+          PAGE HEADER
+      ===================================================== */}
+
+      <div className="top-header settings-header">
+
+        <div className="settings-title-area">
+
           <h1>
-            Account <span className="gradient-text">Settings</span>
+            Account{" "}
+            <span className="gradient-text">
+              Settings
+            </span>
           </h1>
 
           <p>
             Manage your account and application session.
           </p>
+
         </div>
+
+
+        {currentUser && (
+          <div className="settings-user-badge">
+
+            <div className="settings-user-icon">
+              👤
+            </div>
+
+            <div className="settings-user-info">
+
+              <span>
+                Welcome,
+              </span>
+
+              <strong>
+                {currentUser.name}
+              </strong>
+
+            </div>
+
+            <span className="settings-online-dot"></span>
+
+          </div>
+        )}
+
       </div>
 
 
+      {/* =====================================================
+          SETTINGS CONTENT
+      ===================================================== */}
+
       <div className="settings-content">
 
-        <div className="dashboard-card settings-card">
+
+        {/* ===================================================
+            ACCOUNT INFORMATION
+        =================================================== */}
+
+        <section className="dashboard-card settings-card">
 
           <div className="card-header">
-            <h2>Account</h2>
+
+            <h2>
+              Account Information
+            </h2>
+
           </div>
 
-          <div className="settings-section">
 
-            <div className="settings-info">
-              <h3>Session</h3>
+          <div className="settings-profile">
 
-              <p>
-                You are currently signed in to AI CSV Analyzer.
-              </p>
+            <div className="settings-avatar">
+              👤
             </div>
 
 
-            <button
-              type="button"
-              className="logout-button"
-              onClick={handleLogout}
-            >
-              Logout
-            </button>
+            <div className="settings-profile-info">
+
+              <h3>
+                {currentUser?.name ||
+                  "Authenticated User"}
+              </h3>
+
+              <p>
+                {currentUser?.email ||
+                  "Account email"}
+              </p>
+
+            </div>
 
           </div>
 
-        </div>
+
+          <div className="settings-account-details-row">
+
+
+            <div className="settings-detail-item">
+
+              <span className="settings-detail-label">
+                Email
+              </span>
+
+              <strong className="settings-detail-value">
+                {currentUser?.email ||
+                  "Not available"}
+              </strong>
+
+            </div>
+
+
+            <div className="settings-detail-item">
+
+              <span className="settings-detail-label">
+                Account Status
+              </span>
+
+              <strong className="account-status">
+                <span className="status-dot"></span>
+                Active
+              </strong>
+
+            </div>
+
+
+          </div>
+
+        </section>
+
+
+        {/* ===================================================
+            SESSION MANAGEMENT
+        =================================================== */}
+
+        <section className="dashboard-card settings-card session-card">
+
+
+          <div className="card-header">
+
+            <h2>
+              Session Management
+            </h2>
+
+          </div>
+
+
+          <p className="session-description">
+            You are currently signed in to AI CSV Analyzer.
+          </p>
+
+
+          {/* -------------------------------------------------
+              SESSION STATUS
+          ------------------------------------------------- */}
+
+          <div className="active-session">
+
+
+            <div className="active-session-indicator">
+
+              <span className="active-session-dot"></span>
+
+              <div className="active-session-text">
+
+                <strong>
+                  Active Session
+                </strong>
+
+                <span>
+                  Your session is active and secure.
+                </span>
+
+              </div>
+
+            </div>
+
+
+            <div className="session-user">
+
+              <span>
+                Logged in as
+              </span>
+
+              <strong>
+                {currentUser?.name ||
+                  "Authenticated User"}
+              </strong>
+
+            </div>
+
+
+          </div>
+
+
+          {/* -------------------------------------------------
+              SESSION EXPIRATION
+          ------------------------------------------------- */}
+
+          <div className="session-expiration">
+
+
+            <div className="session-expiration-header">
+
+              <div className="expiration-label">
+
+                <span>
+                  Session expires in
+                </span>
+
+                <small>
+                  Your login session countdown
+                </small>
+
+              </div>
+
+
+              <strong
+                className={
+                  isSessionWarning
+                    ? "session-timer-warning"
+                    : "session-timer"
+                }
+              >
+                {formatRemainingTime()}
+              </strong>
+
+            </div>
+
+
+            <div className="session-progress-track">
+
+              <div
+                className={
+                  isSessionWarning
+                    ? "session-progress-bar session-progress-warning"
+                    : "session-progress-bar"
+                }
+                style={{
+                  width: `${getSessionProgress()}%`,
+                }}
+              />
+
+            </div>
+
+
+            <div className="session-expiration-footer">
+
+              <span>
+                Session lifetime
+              </span>
+
+              <span>
+                {isSessionWarning
+                  ? "Expiring soon"
+                  : "Active"}
+              </span>
+
+            </div>
+
+
+            <p
+              className={
+                isSessionWarning
+                  ? "session-expiration-note session-expiration-warning"
+                  : "session-expiration-note"
+              }
+            >
+              {isSessionWarning
+                ? "Your session is about to expire. Please save your work."
+                : "You'll need to sign in again when your session expires."}
+            </p>
+
+
+          </div>
+
+
+          {/* -------------------------------------------------
+              LOGOUT BUTTON
+          ------------------------------------------------- */}
+
+          <button
+            type="button"
+            className="logout-button"
+            onClick={handleLogout}
+          >
+
+            <span className="logout-icon">
+              ↪
+            </span>
+
+
+            <span className="logout-text">
+
+              <strong>
+                Logout
+              </strong>
+
+              <small>
+                End your current session
+              </small>
+
+            </span>
+
+
+            <span className="logout-arrow">
+              →
+            </span>
+
+          </button>
+
+
+          {/* -------------------------------------------------
+              SECURITY NOTE
+          ------------------------------------------------- */}
+
+          <div className="security-note">
+
+            <span className="security-icon">
+              🛡
+            </span>
+
+            <span>
+              For your security, make sure to logout
+              when using a shared device.
+            </span>
+
+          </div>
+
+
+        </section>
 
       </div>
 
     </div>
   );
 }
-
 
 /* =========================================================
    MAIN APPLICATION
@@ -151,7 +655,8 @@ function MainApplication() {
     ---------------------------------------------------------
   */
 
-  const [datasetHistory, setDatasetHistory] = useState([]);
+  const [datasetHistory, setDatasetHistory] =
+    useState([]);
 
 
   /*
@@ -160,7 +665,8 @@ function MainApplication() {
     ---------------------------------------------------------
   */
 
-  const [selectedDataset, setSelectedDataset] = useState(null);
+  const [selectedDataset, setSelectedDataset] =
+    useState(null);
 
 
   /*
@@ -169,7 +675,8 @@ function MainApplication() {
     ---------------------------------------------------------
   */
 
-  const [file, setFile] = useState(null);
+  const [file, setFile] =
+    useState(null);
 
 
   /*
@@ -178,7 +685,8 @@ function MainApplication() {
     ---------------------------------------------------------
   */
 
-  const [analysis, setAnalysis] = useState(null);
+  const [analysis, setAnalysis] =
+    useState(null);
 
 
   /*
@@ -187,7 +695,8 @@ function MainApplication() {
     ---------------------------------------------------------
   */
 
-  const [message, setMessage] = useState("");
+  const [message, setMessage] =
+    useState("");
 
 
   /*
@@ -202,17 +711,19 @@ function MainApplication() {
 
       try {
 
-        const response = await fetch(
-          "http://localhost:5000/api/datasets",
-          {
-            headers: {
-              ...getAuthHeaders(),
-            },
-          }
-        );
+        const response =
+          await fetch(
+            "http://localhost:5000/api/datasets",
+            {
+              headers: {
+                ...getAuthHeaders(),
+              },
+            }
+          );
 
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
 
         if (!response.ok) {
@@ -226,39 +737,50 @@ function MainApplication() {
         }
 
 
-        const mongoDatasets = data
+        const mongoDatasets =
+          data
 
-          .map((document) => ({
-            id: document._id,
+            .map((document) => ({
 
-            fileName: document.file,
+              id: document._id,
 
-            fileSize:
-              document.file_size ?? null,
+              fileName:
+                document.file,
 
-            fileHash:
-              document.file_hash ?? null,
+              fileSize:
+                document.file_size ??
+                null,
 
-            analysis: document,
+              fileHash:
+                document.file_hash ??
+                null,
 
-            analyzedAt:
-              document.created_at,
-          }))
+              analysis:
+                document,
 
-          .filter(
-            (dataset, index, history) =>
-              dataset.fileHash
-                ? history.findIndex(
-                    (item) =>
-                      item.fileHash ===
-                      dataset.fileHash
-                  ) === index
-                : history.findIndex(
-                    (item) =>
-                      item.id ===
-                      dataset.id
-                  ) === index
-          );
+              analyzedAt:
+                document.created_at,
+
+            }))
+
+
+            .filter(
+              (dataset, index, history) =>
+
+                dataset.fileHash
+
+                  ? history.findIndex(
+                      (item) =>
+                        item.fileHash ===
+                        dataset.fileHash
+                    ) === index
+
+                  : history.findIndex(
+                      (item) =>
+                        item.id ===
+                        dataset.id
+                    ) === index
+            );
 
 
         setDatasetHistory(
@@ -395,6 +917,7 @@ function MainApplication() {
     const formData =
       new FormData();
 
+
     formData.append(
       "file",
       file
@@ -465,7 +988,8 @@ function MainApplication() {
 
       const dataset = {
 
-        id: data._id,
+        id:
+          data._id,
 
         fileName:
           data.file,
@@ -510,10 +1034,13 @@ function MainApplication() {
           const filteredHistory =
             previousHistory.filter(
               (item) =>
+
                 item.id !==
                   dataset.id &&
+
                 (
                   !dataset.fileHash ||
+
                   item.fileHash !==
                     dataset.fileHash
                 )
@@ -759,9 +1286,11 @@ function MainApplication() {
 
                 setSelectedDataset={
                   (dataset) => {
+
                     saveSelectedDataset(
                       dataset
                     );
+
                   }
                 }
 
