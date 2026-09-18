@@ -1,45 +1,93 @@
-from flask import Flask, request
+# =========================================================
+# AI CSV DATA ANALYZER - AUTHENTICATED BACKEND
+# =========================================================
+# Flask + MongoDB + JWT + Pandas + IsolationForest
+# Dataset ownership: datasets.user_id = authenticated JWT user ID
+# Duplicate rule: same file_hash may exist once per user.
+# Legacy records are not automatically assigned to users.
+# =========================================================
+
+from flask import Flask,request
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required,get_jwt_identity
+from werkzeug.security import generate_password_hash, check_password_hash
+
 import pandas as pd
 import math
 from sklearn.ensemble import IsolationForest
 
 import os
 import json
-import hashlib 
+import hashlib
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
-from datetime import datetime, timezone
+from datetime import datetime,timezone 
 
 
 # =========================================================
 # FLASK + MONGODB SETUP
 # =========================================================
 
-app = Flask(__name__)
+app=Flask(__name__)
 CORS(app)
 
 load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URI=os.getenv("MONGO_URI")
 
-client = MongoClient(MONGO_URI)
+client=MongoClient(MONGO_URI)
 
-db = client["ai_csv_analyzer"]
-datasets_collection = db["datasets"]
+db=client["ai_csv_analyzer"]
+
+users_collection=db["users"]
+datasets_collection=db["datasets"]
+
+#=====================================
+# JWT Configuration
+#=====================================
+
+JWT_SECRET_KEY=os.getenv("JWT_SECRET_KEY")
+
+if not JWT_SECRET_KEY:
+    raise RuntimeError("JWT_SECRET_KEY is not configured.")
+
+app.config["JWT_SECRET_KEY"]=JWT_SECRET_KEY
+
+jwt=JWTManager(app)
 
 
-# A sparse unique index keeps legacy documents valid while
-# guaranteeing that each new file hash can exist only once.
+# Dataset ownership index.
+# Remove the old global file_hash index if it still exists, then enforce
+# uniqueness only for authenticated user-owned documents.
 try:
+    existing_indexes = datasets_collection.index_information()
+
+    if "file_hash_1" in existing_indexes:
+        datasets_collection.drop_index("file_hash_1")
+        print("Removed old global file_hash index.")
+
     datasets_collection.create_index(
-        [("file_hash", 1)],
+        [
+            ("user_id", 1),
+            ("file_hash", 1)
+        ],
         unique=True,
-        sparse=True
+        partialFilterExpression={
+            "user_id": {"$exists": True},
+            "file_hash": {"$exists": True}
+        }
     )
 except Exception as error:
-    print("MongoDB index setup warning:", error)
+    print("MongoDB dataset index setup warning:", error)
+
+try:
+    users_collection.create_index(
+        [("email", 1)],
+        unique=True
+    )
+except Exception as error:
+    print("MongoDB user index setup warning:", error)
 
 
 # =========================================================
@@ -829,16 +877,184 @@ def test_api():
             "React and Flask are ready to communicate!"
 
     }
+
+#=========================================================
+# REGISTER API
+#=========================================================
+
+@app.route("/api/auth/register", methods=["POST"])
+def register():
+
+    try:
+
+        data = request.get_json()
+
+        if not data:
+            return {
+                "error": "Request body is required."
+            }, 400
+
+        name = data.get("name", "").strip()
+        email = data.get("email", "").strip().lower()
+        password = data.get("password", "")
+
+        #===========================================
+        # Validation
+        #===========================================
+
+        if not name:
+            return {
+                "error": "Name is required."
+            }, 400
+
+        if not email:
+            return {
+                "error": "Email is required."
+            }, 400
+
+        if not password:
+            return {
+                "error": "Password is required."
+            }, 400
+
+        if len(password) < 8:
+            return {
+                "error": "Password must be at least 8 characters long."
+            }, 400
+
+        #=============================================
+        # Checking existing User
+        #=============================================
+
+        existing_user = users_collection.find_one({
+            "email": email
+        })
+
+        if existing_user:
+            return {
+                "error": "An account with this email already exists."
+            }, 409
+
+        #=============================================
+        # Hash Password
+        #=============================================
+
+        password_hash = generate_password_hash(password)
+
+        #=============================================
+        # Create User
+        #=============================================
+
+        user_document = {
+            "name": name,
+            "email": email,
+            "password_hash": password_hash,
+            "created_at": datetime.now(timezone.utc)
+        }
+
+        users_collection.insert_one(user_document)
+
+        return {
+            "message": "Account created successfully."
+        }, 201
+
+    except DuplicateKeyError:
+        return {
+            "error": "An account with this email already exists."
+        }, 409
+
+    except Exception as error:
+        return {
+            "error": str(error)
+        }, 500
+
+
+
+
+# =========================================================
+# LOGIN API
+# =========================================================
+
+@app.route("/api/auth/login", methods=["POST"])
+def login():
+
+    try:
+
+        data = request.get_json()
+
+        if not data:
+            return {
+                "error": "Request body is required."
+            }, 400
+
+        email = data.get("email", "").strip().lower()
+        password = data.get("password", "")
+
+        if not email:
+            return {
+                "error": "Email is required."
+            }, 400
+
+        if not password:
+            return {
+                "error": "Password is required."
+            }, 400
+
+        user = users_collection.find_one({
+            "email": email
+        })
+
+        if not user:
+            return {
+                "error": "Invalid email or password."
+            }, 401
+
+        password_valid = check_password_hash(
+            user["password_hash"],
+            password
+        )
+
+        if not password_valid:
+            return {
+                "error": "Invalid email or password."
+            }, 401
+
+        access_token = create_access_token(
+            identity=str(user["_id"])
+        )
+
+        return {
+            "message": "Login successful.",
+            "access_token": access_token,
+            "user": {
+                "id": str(user["_id"]),
+                "name": user["name"],
+                "email": user["email"]
+            }
+        }, 200
+
+    except Exception as error:
+
+        return {
+            "error": str(error)
+        }, 500
+
+
 # =========================================================
 # GET SAVED DATASETS
 # =========================================================
 
 @app.route("/api/datasets", methods=["GET"])
+@jwt_required()
 def get_datasets():
 
     try:
 
-        documents = datasets_collection.find().sort(
+        user_id = get_jwt_identity()
+
+        documents = datasets_collection.find({
+            "user_id": user_id
+        }).sort(
             "created_at",
             -1
         )
@@ -860,96 +1076,6 @@ def get_datasets():
         }, 500
 
 # =========================================================
-# TEMPORARY MIGRATION ENDPOINT
-# =========================================================
-
-@app.route("/api/migrate-dataset", methods=["POST"])
-def migrate_dataset():
-
-    try:
-
-        dataset = request.get_json()
-
-        if not dataset:
-            return {
-                "error": "No dataset provided."
-            }, 400
-
-        analysis = dataset.get("analysis")
-
-        if not analysis:
-            return {
-                "error": "No analysis data provided."
-            }, 400
-
-        file_hash = (
-            dataset.get("file_hash")
-            or dataset.get("fileHash")
-        )
-
-        if not file_hash:
-            return {
-                "error":
-                    "Migration requires a file_hash. Upload the original CSV through /api/upload instead."
-            }, 400
-
-        existing_dataset = datasets_collection.find_one(
-            {"file_hash": file_hash}
-        )
-
-        if existing_dataset:
-            return {
-                "message": "Dataset already exists.",
-                "file": analysis.get("file")
-            }, 200
-
-        mongodb_document = {
-            **analysis,
-            "file_hash": file_hash,
-            "file_size": dataset.get("file_size"),
-            "created_at": dataset.get(
-                "analyzedAt",
-                datetime.now(timezone.utc).isoformat()
-            )
-        }
-
-        try:
-
-            datasets_collection.insert_one(
-                mongodb_document
-            )
-
-        except DuplicateKeyError:
-
-            existing_dataset = datasets_collection.find_one(
-                {"file_hash": file_hash}
-            )
-
-            if existing_dataset:
-
-                existing_response = serialize_mongo_document(
-                    existing_dataset
-                )
-
-                existing_response["already_analyzed"] = True
-                existing_response["message"] = "Dataset already exists. Loaded the saved analysis."
-
-                return existing_response, 200
-
-            raise
-
-        return {
-            "message": "Dataset migrated successfully.",
-            "file": analysis.get("file"),
-            "file_hash": file_hash
-        }, 201
-
-    except Exception as error:
-
-        return {
-            "error": str(error)
-        }, 500  
-# =========================================================
 # CSV UPLOAD AND ANALYSIS
 # =========================================================
 
@@ -957,7 +1083,14 @@ def migrate_dataset():
     "/api/upload",
     methods=["POST"]
 )
+@jwt_required()
 def upload_csv():
+
+    # -----------------------------------------------------
+    # Get authenticated user
+    # -----------------------------------------------------
+
+    user_id = get_jwt_identity()
 
     # -----------------------------------------------------
     # Get uploaded file
@@ -1022,6 +1155,7 @@ def upload_csv():
 
     existing_dataset = datasets_collection.find_one(
         {
+            "user_id": user_id,
             "file_hash":
                 file_hash
         }
@@ -1679,6 +1813,9 @@ def upload_csv():
 
             **analysis_result,
 
+            "user_id":
+                user_id,
+
             "file_hash":
                 file_hash,
 
@@ -1702,7 +1839,10 @@ def upload_csv():
             # the same time, the unique MongoDB index prevents
             # a second document from being created.
             existing_dataset = datasets_collection.find_one(
-                {"file_hash": file_hash}
+                {
+                    "user_id": user_id,
+                    "file_hash": file_hash
+                }
             )
 
             if existing_dataset:
