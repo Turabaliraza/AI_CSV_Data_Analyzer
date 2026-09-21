@@ -40,7 +40,12 @@ function Dashboard({
       {/* Page Header */}
       <div className="page-header">
         <div>
-          <h1>CSV Data Analyzer</h1>
+          <h1>
+              CSV{" "}
+             <span className="gradient-text">
+              Data Analyzer
+            </span>
+        </h1>
           <p>
             Upload a CSV file and generate an intelligent analysis of your
             dataset.

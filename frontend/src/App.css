@@ -5983,3 +5983,116 @@ input {
   }
 
 }
+/* =========================================================
+   SIDEBAR BRAND VISIBILITY
+   ========================================================= */
+
+.sidebar-brand > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sidebar-brand h2 {
+  margin: 0;
+
+  color: #f8fafc;
+
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 700;
+
+  letter-spacing: -0.3px;
+
+  text-shadow:
+    0 0 16px rgba(168, 85, 247, 0.12);
+}
+
+.sidebar-brand-subtitle {
+  display: block;
+
+  margin: 0;
+
+  color: #94a3b8;
+
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 500;
+}
+/* =========================================================
+   GLOBAL HEADING THEME
+   ========================================================= */
+
+/* Main page headings */
+.top-header h1,
+.page-container h1 {
+  color: #f8fafc;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+
+/* Gradient accent used inside headings */
+.gradient-text {
+  background:
+    linear-gradient(
+      90deg,
+      #a855f7,
+      #6366f1,
+      #60a5fa
+    );
+
+  -webkit-background-clip: text;
+  background-clip: text;
+
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+
+  text-shadow: none;
+}
+
+
+/* Dashboard / section headings */
+.card-header h2,
+.upload-heading h2,
+.dashboard-card h2,
+.upload-card h2 {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+
+/* Smaller headings */
+.dashboard-card h3,
+.upload-card h3 {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+
+/* Sidebar product heading */
+.sidebar-brand h2 {
+  margin: 0;
+
+  color: #f8fafc;
+
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 700;
+
+  letter-spacing: -0.3px;
+
+  text-shadow:
+    0 0 16px rgba(168, 85, 247, 0.12);
+}
+
+
+/* Sidebar supporting text */
+.sidebar-brand-subtitle {
+  color: #94a3b8;
+
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 500;
+}

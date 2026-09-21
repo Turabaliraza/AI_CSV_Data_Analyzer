@@ -7,7 +7,12 @@ function Anomalies({ analysis, selectedDataset }) {
     return (
       <div className="page-container">
         <div className="page-header">
-          <h1>Anomaly Detection</h1>
+          <h1>
+            Anomaly{" "}
+            <span className="gradient-text">
+              Detection
+            </span>
+          </h1>
 
           <p>
             Select a dataset from CSV Analysis History to inspect detected
@@ -47,7 +52,12 @@ function Anomalies({ analysis, selectedDataset }) {
 
       {/* Page Header */}
       <div className="page-header">
-        <h1>Anomaly Detection</h1>
+        <h1>
+          Anomaly{" "}
+          <span className="gradient-text">
+            Detection
+          </span>
+        </h1>
 
         <p>
           Inspect records identified as unusual by the machine-learning

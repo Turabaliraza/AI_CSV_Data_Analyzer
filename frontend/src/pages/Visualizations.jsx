@@ -154,7 +154,7 @@ function Visualizations({ analysis, selectedDataset }) {
 
   /* --------------------------------------------------
      DETERMINE DISCRETE NUMERIC COLUMN
-     
+
      Examples:
        accommodates = 1,2,3,4,5,6
        bedrooms     = 1,2,3,4
@@ -208,16 +208,17 @@ function Visualizations({ analysis, selectedDataset }) {
     }
 
     const visualization =
-  visualizationData.numeric[selectedColumn];
+      visualizationData.numeric[selectedColumn];
 
-const rawData =
-  Array.isArray(visualization)
-    ? visualization
-    : visualization?.data;
+    const rawData =
+      Array.isArray(visualization)
+        ? visualization
+        : visualization?.data;
 
-if (!Array.isArray(rawData)) {
-  return [];
-}
+    if (!Array.isArray(rawData)) {
+      return [];
+    }
+
     return rawData
       .map((item, index) => {
         const label =
@@ -548,7 +549,10 @@ if (!Array.isArray(rawData)) {
         <div className="page-header">
           <div>
             <h1>
-              Visualizations
+              Data{" "}
+              <span className="gradient-text">
+                Visualizations
+              </span>
             </h1>
 
             <p>
@@ -594,7 +598,10 @@ if (!Array.isArray(rawData)) {
         <div>
 
           <h1>
-            Visualizations
+            Data{" "}
+            <span className="gradient-text">
+              Visualizations
+            </span>
           </h1>
 
           <p>

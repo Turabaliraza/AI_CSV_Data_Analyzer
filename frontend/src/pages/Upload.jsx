@@ -22,7 +22,12 @@ function Upload({
       {/* Page Header */}
       <div className="page-header">
         <div>
-          <h1>CSV Analysis History</h1>
+          <h1>
+              CSV{" "}
+            <span className="gradient-text">
+               Analysis History
+            </span>
+          </h1>
           <p>
             View and explore analysis from previously uploaded CSV datasets.
           </p>

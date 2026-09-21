@@ -7,7 +7,13 @@ function Statistics({ analysis, selectedDataset }) {
     return (
       <div className="page-container">
         <div className="page-header">
-          <h1>Statistical Analysis</h1>
+          <h1>
+            Statistical{" "}
+            <span className="gradient-text">
+              Analysis
+            </span>
+          </h1>
+
           <p>
             Select a dataset from CSV Analysis History to view its statistics.
           </p>
@@ -35,7 +41,12 @@ function Statistics({ analysis, selectedDataset }) {
 
       {/* Page Header */}
       <div className="page-header">
-        <h1>Statistical Analysis</h1>
+        <h1>
+          Statistical{" "}
+          <span className="gradient-text">
+            Analysis
+          </span>
+        </h1>
 
         <p>
           Statistical summary of numeric columns in your dataset.
@@ -47,7 +58,9 @@ function Statistics({ analysis, selectedDataset }) {
       <div className="dataset-title-card">
 
         <div>
-          <span className="dataset-label">CURRENT DATASET</span>
+          <span className="dataset-label">
+            CURRENT DATASET
+          </span>
 
           <h2>{data.file}</h2>
 
@@ -205,27 +218,37 @@ function Statistics({ analysis, selectedDataset }) {
 
                     <div className="stat-value">
                       <span>Mean</span>
-                      <strong>{stats.mean ?? "—"}</strong>
+                      <strong>
+                        {stats.mean ?? "—"}
+                      </strong>
                     </div>
 
                     <div className="stat-value">
                       <span>Median</span>
-                      <strong>{stats.median ?? "—"}</strong>
+                      <strong>
+                        {stats.median ?? "—"}
+                      </strong>
                     </div>
 
                     <div className="stat-value">
                       <span>Minimum</span>
-                      <strong>{stats.min ?? "—"}</strong>
+                      <strong>
+                        {stats.min ?? "—"}
+                      </strong>
                     </div>
 
                     <div className="stat-value">
                       <span>Maximum</span>
-                      <strong>{stats.max ?? "—"}</strong>
+                      <strong>
+                        {stats.max ?? "—"}
+                      </strong>
                     </div>
 
                     <div className="stat-value">
                       <span>Std. Deviation</span>
-                      <strong>{stats.std ?? "—"}</strong>
+                      <strong>
+                        {stats.std ?? "—"}
+                      </strong>
                     </div>
 
                   </div>

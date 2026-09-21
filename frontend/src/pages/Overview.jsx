@@ -7,7 +7,12 @@ function Overview({ analysis, selectedDataset }) {
     return (
       <div className="page-container">
         <div className="page-header">
-          <h1>Dataset Overview</h1>
+        <h1>
+            Dataset{" "}
+        <span className="gradient-text">
+            Overview
+        </span>
+         </h1>
           <p>
             Select a dataset from CSV Analysis History to view its analysis.
           </p>

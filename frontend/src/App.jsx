@@ -78,15 +78,15 @@ function Settings() {
   const [remainingSeconds, setRemainingSeconds] = useState(null);
   const [sessionDuration, setSessionDuration] = useState(null);
 
-  /*
-    ---------------------------------------------------------
-    Get current user
-    ---------------------------------------------------------
-  */
+
+  /* ---------------------------------------------------------
+     Get current user
+     --------------------------------------------------------- */
 
   const getCurrentUser = () => {
     try {
-      const storedUser = localStorage.getItem("currentUser");
+      const storedUser =
+        localStorage.getItem("currentUser");
 
       if (!storedUser) {
         return null;
@@ -95,6 +95,7 @@ function Settings() {
       return JSON.parse(storedUser);
 
     } catch (error) {
+
       console.error(
         "Could not read current user:",
         error
@@ -104,142 +105,248 @@ function Settings() {
     }
   };
 
+
   const currentUser = getCurrentUser();
 
 
-  /*
-    ---------------------------------------------------------
-    JWT SESSION TIMER
-    ---------------------------------------------------------
-  */
+  /* ---------------------------------------------------------
+     Read JWT expiration and run countdown
+     --------------------------------------------------------- */
 
   useEffect(() => {
+
     const calculateRemainingTime = () => {
-      const token = localStorage.getItem("accessToken");
+
+      const token =
+        localStorage.getItem("accessToken");
+
 
       if (!token) {
+
         setRemainingSeconds(null);
+
         return;
+
       }
 
+
       try {
-        const tokenParts = token.split(".");
+
+        const tokenParts =
+          token.split(".");
+
 
         if (tokenParts.length !== 3) {
-          console.error("Invalid JWT format.");
+
+          console.error(
+            "Invalid JWT format."
+          );
+
           setRemainingSeconds(null);
+
           return;
+
         }
 
-        const base64Payload = tokenParts[1]
-          .replace(/-/g, "+")
-          .replace(/_/g, "/");
 
-        const payload = JSON.parse(
-          atob(base64Payload)
-        );
+        /*
+          Decode the JWT payload.
+
+          JWT payloads use Base64URL encoding,
+          so convert it into normal Base64 first.
+        */
+
+        const base64Payload =
+          tokenParts[1]
+            .replace(/-/g, "+")
+            .replace(/_/g, "/");
+
+
+        const payload =
+          JSON.parse(
+            atob(base64Payload)
+          );
+
 
         if (!payload.exp) {
+
           console.error(
             "JWT does not contain an expiration time."
           );
 
           setRemainingSeconds(null);
+
           return;
+
         }
 
-        const expirationTime = payload.exp * 1000;
-        const now = Date.now();
 
-        const remaining = Math.max(
-          0,
-          Math.floor(
-            (expirationTime - now) / 1000
-          )
+        const expirationTime =
+          payload.exp * 1000;
+
+
+        const now =
+          Date.now();
+
+
+        const remaining =
+          Math.max(
+            0,
+            Math.floor(
+              (expirationTime - now) / 1000
+            )
+          );
+
+
+        setRemainingSeconds(
+          remaining
         );
-
-        setRemainingSeconds(remaining);
 
 
         /*
-          Calculate actual JWT session duration.
+          Calculate the original session duration.
+
+          JWT `iat` = issued-at timestamp.
+          JWT `exp` = expiration timestamp.
         */
 
         if (payload.iat) {
-          const totalDuration = Math.max(
-            1,
-            payload.exp - payload.iat
+
+          const totalDuration =
+            Math.max(
+              1,
+              payload.exp - payload.iat
+            );
+
+
+          setSessionDuration(
+            totalDuration
           );
 
-          setSessionDuration(totalDuration);
         }
 
 
         /*
-          Automatically logout when JWT expires.
+          Automatically log out when
+          the JWT reaches zero.
         */
 
         if (remaining <= 0) {
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("currentUser");
-          localStorage.removeItem("selectedCsvDatasetId");
-          localStorage.removeItem("selectedCsvDataset");
 
-          navigate("/login", {
-            replace: true,
-          });
+          localStorage.removeItem(
+            "accessToken"
+          );
+
+          localStorage.removeItem(
+            "access_token"
+          );
+
+          localStorage.removeItem(
+            "currentUser"
+          );
+
+          localStorage.removeItem(
+            "selectedCsvDatasetId"
+          );
+
+          localStorage.removeItem(
+            "selectedCsvDataset"
+          );
+
+          navigate(
+            "/login",
+            {
+              replace: true,
+            }
+          );
+
         }
 
       } catch (error) {
+
         console.error(
           "Could not read JWT expiration:",
           error
         );
+
       }
+
     };
 
 
+    /*
+      Calculate immediately when Settings loads.
+    */
+
     calculateRemainingTime();
 
-    const timer = setInterval(
-      calculateRemainingTime,
-      1000
-    );
 
-    return () => clearInterval(timer);
+    /*
+      Update countdown every second.
+    */
+
+    const timer =
+      setInterval(
+        calculateRemainingTime,
+        1000
+      );
+
+
+    return () =>
+      clearInterval(timer);
 
   }, [navigate]);
 
 
-  /*
-    ---------------------------------------------------------
-    Format remaining time
-    ---------------------------------------------------------
-  */
+  /* ---------------------------------------------------------
+     Format remaining time
+     --------------------------------------------------------- */
 
   const formatRemainingTime = () => {
-    if (remainingSeconds === null) {
+
+    if (
+      remainingSeconds === null
+    ) {
+
       return "--:--";
+
     }
 
-    const hours = Math.floor(
-      remainingSeconds / 3600
-    );
 
-    const minutes = Math.floor(
-      (remainingSeconds % 3600) / 60
-    );
+    const hours =
+      Math.floor(
+        remainingSeconds / 3600
+      );
 
-    const seconds = remainingSeconds % 60;
 
+    const minutes =
+      Math.floor(
+        (remainingSeconds % 3600) / 60
+      );
+
+
+    const seconds =
+      remainingSeconds % 60;
+
+
+    /*
+      Show HH:MM:SS for longer sessions.
+      Show MM:SS for normal sessions.
+    */
 
     if (hours > 0) {
-      return `${String(hours).padStart(2, "0")}:${String(
-        minutes
-      ).padStart(2, "0")}:${String(
-        seconds
-      ).padStart(2, "0")}`;
+
+      return `${String(hours).padStart(
+        2,
+        "0"
+      )}:${String(minutes).padStart(
+        2,
+        "0"
+      )}:${String(seconds).padStart(
+        2,
+        "0"
+      )}`;
+
     }
 
 
@@ -250,51 +357,78 @@ function Settings() {
       2,
       "0"
     )}`;
+
   };
 
 
-  /*
-    ---------------------------------------------------------
-    Session progress
-    ---------------------------------------------------------
-  */
+  /* ---------------------------------------------------------
+     Session progress
+     --------------------------------------------------------- */
 
   const getSessionProgress = () => {
+
     if (
       remainingSeconds === null ||
       sessionDuration === null
     ) {
+
       return 100;
+
     }
+
 
     return Math.min(
       100,
       Math.max(
         0,
-        (remainingSeconds / sessionDuration) * 100
+        (remainingSeconds /
+          sessionDuration) *
+          100
       )
     );
+
   };
 
 
-  /*
-    ---------------------------------------------------------
-    Logout
-    ---------------------------------------------------------
-  */
+  /* ---------------------------------------------------------
+     Logout
+     --------------------------------------------------------- */
 
   const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("currentUser");
-    localStorage.removeItem("selectedCsvDatasetId");
-    localStorage.removeItem("selectedCsvDataset");
 
-    navigate("/login", {
-      replace: true,
-    });
+    localStorage.removeItem(
+      "accessToken"
+    );
+
+    localStorage.removeItem(
+      "access_token"
+    );
+
+    localStorage.removeItem(
+      "currentUser"
+    );
+
+    localStorage.removeItem(
+      "selectedCsvDatasetId"
+    );
+
+    localStorage.removeItem(
+      "selectedCsvDataset"
+    );
+
+    navigate(
+      "/login",
+      {
+        replace: true,
+      }
+    );
+
   };
 
+
+  /* ---------------------------------------------------------
+     Session timer warning
+     --------------------------------------------------------- */
 
   const isSessionWarning =
     remainingSeconds !== null &&
@@ -302,19 +436,21 @@ function Settings() {
 
 
   return (
-    <div className="page-container settings-page">
+
+    <div className="page-container">
 
 
-      {/* =====================================================
+      {/* =================================================
           PAGE HEADER
-      ===================================================== */}
+      ================================================= */}
 
-      <div className="top-header settings-header">
+      <div className="top-header">
 
-        <div className="settings-title-area">
+        <div>
 
           <h1>
             Account{" "}
+
             <span className="gradient-text">
               Settings
             </span>
@@ -327,14 +463,19 @@ function Settings() {
         </div>
 
 
+        {/* =================================================
+            CURRENT USER
+        ================================================= */}
+
         {currentUser && (
+
           <div className="settings-user-badge">
 
             <div className="settings-user-icon">
               👤
             </div>
 
-            <div className="settings-user-info">
+            <div>
 
               <span>
                 Welcome,
@@ -346,26 +487,24 @@ function Settings() {
 
             </div>
 
-            <span className="settings-online-dot"></span>
+            <span className="settings-online-dot">
+            </span>
 
           </div>
+
         )}
 
       </div>
 
 
-      {/* =====================================================
-          SETTINGS CONTENT
-      ===================================================== */}
-
       <div className="settings-content">
 
 
-        {/* ===================================================
+        {/* =================================================
             ACCOUNT INFORMATION
-        =================================================== */}
+        ================================================= */}
 
-        <section className="dashboard-card settings-card">
+        <div className="dashboard-card settings-card">
 
           <div className="card-header">
 
@@ -376,14 +515,14 @@ function Settings() {
           </div>
 
 
-          <div className="settings-profile">
+          <div className="settings-account">
 
             <div className="settings-avatar">
               👤
             </div>
 
 
-            <div className="settings-profile-info">
+            <div className="settings-account-details">
 
               <h3>
                 {currentUser?.name ||
@@ -402,14 +541,13 @@ function Settings() {
 
           <div className="settings-account-details-row">
 
-
             <div className="settings-detail-item">
 
-              <span className="settings-detail-label">
+              <span>
                 Email
               </span>
 
-              <strong className="settings-detail-value">
+              <strong>
                 {currentUser?.email ||
                   "Not available"}
               </strong>
@@ -419,29 +557,26 @@ function Settings() {
 
             <div className="settings-detail-item">
 
-              <span className="settings-detail-label">
+              <span>
                 Account Status
               </span>
 
               <strong className="account-status">
-                <span className="status-dot"></span>
                 Active
               </strong>
 
             </div>
 
-
           </div>
 
-        </section>
+        </div>
 
 
-        {/* ===================================================
+        {/* =================================================
             SESSION MANAGEMENT
-        =================================================== */}
+        ================================================= */}
 
-        <section className="dashboard-card settings-card session-card">
-
+        <div className="dashboard-card settings-card session-card">
 
           <div className="card-header">
 
@@ -457,18 +592,19 @@ function Settings() {
           </p>
 
 
-          {/* -------------------------------------------------
-              SESSION STATUS
-          ------------------------------------------------- */}
+          {/* =================================================
+              ACTIVE SESSION
+          ================================================= */}
 
           <div className="active-session">
 
-
             <div className="active-session-indicator">
 
-              <span className="active-session-dot"></span>
+              <span className="active-session-dot">
+              </span>
 
-              <div className="active-session-text">
+
+              <div>
 
                 <strong>
                   Active Session
@@ -496,37 +632,27 @@ function Settings() {
 
             </div>
 
-
           </div>
 
 
-          {/* -------------------------------------------------
-              SESSION EXPIRATION
-          ------------------------------------------------- */}
+          {/* =================================================
+              EXPIRATION TIMER
+          ================================================= */}
 
           <div className="session-expiration">
 
-
             <div className="session-expiration-header">
 
-              <div className="expiration-label">
-
-                <span>
-                  Session expires in
-                </span>
-
-                <small>
-                  Your login session countdown
-                </small>
-
-              </div>
+              <span>
+                Session expires in
+              </span>
 
 
               <strong
                 className={
                   isSessionWarning
                     ? "session-timer-warning"
-                    : "session-timer"
+                    : ""
                 }
               >
                 {formatRemainingTime()}
@@ -538,30 +664,11 @@ function Settings() {
             <div className="session-progress-track">
 
               <div
-                className={
-                  isSessionWarning
-                    ? "session-progress-bar session-progress-warning"
-                    : "session-progress-bar"
-                }
+                className="session-progress-bar"
                 style={{
                   width: `${getSessionProgress()}%`,
                 }}
               />
-
-            </div>
-
-
-            <div className="session-expiration-footer">
-
-              <span>
-                Session lifetime
-              </span>
-
-              <span>
-                {isSessionWarning
-                  ? "Expiring soon"
-                  : "Active"}
-              </span>
 
             </div>
 
@@ -573,18 +680,19 @@ function Settings() {
                   : "session-expiration-note"
               }
             >
+
               {isSessionWarning
                 ? "Your session is about to expire. Please save your work."
                 : "You'll need to sign in again when your session expires."}
-            </p>
 
+            </p>
 
           </div>
 
 
-          {/* -------------------------------------------------
-              LOGOUT BUTTON
-          ------------------------------------------------- */}
+          {/* =================================================
+              LOGOUT
+          ================================================= */}
 
           <button
             type="button"
@@ -609,21 +717,16 @@ function Settings() {
 
             </span>
 
-
-            <span className="logout-arrow">
-              →
-            </span>
-
           </button>
 
 
-          {/* -------------------------------------------------
+          {/* =================================================
               SECURITY NOTE
-          ------------------------------------------------- */}
+          ================================================= */}
 
           <div className="security-note">
 
-            <span className="security-icon">
+            <span>
               🛡
             </span>
 
@@ -634,14 +737,15 @@ function Settings() {
 
           </div>
 
-
-        </section>
+        </div>
 
       </div>
 
     </div>
+
   );
 }
+
 
 /* =========================================================
    MAIN APPLICATION
@@ -649,61 +753,49 @@ function Settings() {
 
 function MainApplication() {
 
-  /*
-    ---------------------------------------------------------
-    Dataset history
-    ---------------------------------------------------------
-  */
+  /* ---------------------------------------------------------
+     Dataset history
+     --------------------------------------------------------- */
 
   const [datasetHistory, setDatasetHistory] =
     useState([]);
 
 
-  /*
-    ---------------------------------------------------------
-    Current selected dataset
-    ---------------------------------------------------------
-  */
+  /* ---------------------------------------------------------
+     Current selected dataset
+     --------------------------------------------------------- */
 
   const [selectedDataset, setSelectedDataset] =
     useState(null);
 
 
-  /*
-    ---------------------------------------------------------
-    Current uploaded file
-    ---------------------------------------------------------
-  */
+  /* ---------------------------------------------------------
+     Current uploaded file
+     --------------------------------------------------------- */
 
   const [file, setFile] =
     useState(null);
 
 
-  /*
-    ---------------------------------------------------------
-    Current analysis
-    ---------------------------------------------------------
-  */
+  /* ---------------------------------------------------------
+     Current analysis
+     --------------------------------------------------------- */
 
   const [analysis, setAnalysis] =
     useState(null);
 
 
-  /*
-    ---------------------------------------------------------
-    Status / upload message
-    ---------------------------------------------------------
-  */
+  /* ---------------------------------------------------------
+     Status / upload message
+     --------------------------------------------------------- */
 
   const [message, setMessage] =
     useState("");
 
 
-  /*
-    ---------------------------------------------------------
-    Load dataset history from MongoDB
-    ---------------------------------------------------------
-  */
+  /* ---------------------------------------------------------
+     Load dataset history from MongoDB
+     --------------------------------------------------------- */
 
   useEffect(() => {
 
@@ -857,11 +949,9 @@ function MainApplication() {
   }, []);
 
 
-  /*
-    ---------------------------------------------------------
-    Helper: save selected dataset ID
-    ---------------------------------------------------------
-  */
+  /* ---------------------------------------------------------
+     Helper: save selected dataset ID
+     --------------------------------------------------------- */
 
   const saveSelectedDataset = (
     dataset
@@ -890,11 +980,9 @@ function MainApplication() {
   };
 
 
-  /*
-    ---------------------------------------------------------
-    Analyze / load CSV
-    ---------------------------------------------------------
-  */
+  /* ---------------------------------------------------------
+     Analyze / load CSV
+     --------------------------------------------------------- */
 
   const handleUpload = async () => {
 
@@ -1113,13 +1201,16 @@ function MainApplication() {
           <div>
 
             <h2>
-              CSV Analyzer
+              CSV{" "}
+              <span className="gradient-text">
+                Analyzer
+              </span>
             </h2>
 
 
-            <span>
+            <div className="sidebar-brand-subtitle">
               Intelligent Data Analysis
-            </span>
+            </div>
 
           </div>
 

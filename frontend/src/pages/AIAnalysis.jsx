@@ -7,7 +7,13 @@ function AIAnalysis({ analysis, selectedDataset }) {
     return (
       <div className="page-container">
         <div className="page-header">
-          <h1>AI Analysis</h1>
+          <h1>
+            AI{" "}
+            <span className="gradient-text">
+              Analysis
+            </span>
+          </h1>
+
           <p>
             Select a dataset from CSV Analysis History to view its AI-powered
             analysis.
@@ -45,7 +51,12 @@ function AIAnalysis({ analysis, selectedDataset }) {
 
       {/* Page Header */}
       <div className="page-header">
-        <h1>AI Analysis</h1>
+        <h1>
+          AI{" "}
+          <span className="gradient-text">
+            Analysis
+          </span>
+        </h1>
 
         <p>
           Machine-learning analysis of patterns and potential anomalies in
@@ -175,11 +186,13 @@ function AIAnalysis({ analysis, selectedDataset }) {
                 className="ai-column-item"
                 key={column}
               >
+
                 <span className="ai-column-dot" />
 
                 <span>
                   {column}
                 </span>
+
               </div>
             ))}
 
@@ -222,6 +235,7 @@ function AIAnalysis({ analysis, selectedDataset }) {
                 className="ai-column-item ai-identifier-item"
                 key={column}
               >
+
                 <span className="ai-column-dot" />
 
                 <span>
@@ -231,6 +245,7 @@ function AIAnalysis({ analysis, selectedDataset }) {
                 <strong>
                   Excluded
                 </strong>
+
               </div>
             ))}
 
@@ -272,12 +287,14 @@ function AIAnalysis({ analysis, selectedDataset }) {
             </div>
 
             <div>
+
               <h3>No Anomalies Detected</h3>
 
               <p>
                 The Isolation Forest model did not classify any rows as
                 anomalous in the analyzed data.
               </p>
+
             </div>
 
           </div>
@@ -291,6 +308,7 @@ function AIAnalysis({ analysis, selectedDataset }) {
             </div>
 
             <div>
+
               <h3>
                 {anomalyCount.toLocaleString()} Potential Anomalies Detected
               </h3>
@@ -301,6 +319,7 @@ function AIAnalysis({ analysis, selectedDataset }) {
                 Anomalies page for the individual records and their anomaly
                 scores.
               </p>
+
             </div>
 
           </div>
@@ -335,11 +354,13 @@ function AIAnalysis({ analysis, selectedDataset }) {
             </div>
 
             <div>
+
               <h3>Detect Numeric Features</h3>
 
               <p>
                 The analyzer identifies numeric columns in the uploaded CSV.
               </p>
+
             </div>
 
           </div>
@@ -352,12 +373,14 @@ function AIAnalysis({ analysis, selectedDataset }) {
             </div>
 
             <div>
+
               <h3>Handle Missing Values</h3>
 
               <p>
                 Missing numeric values are filled using column medians, with
                 zero used as a final fallback.
               </p>
+
             </div>
 
           </div>
@@ -370,12 +393,14 @@ function AIAnalysis({ analysis, selectedDataset }) {
             </div>
 
             <div>
+
               <h3>Exclude Identifiers</h3>
 
               <p>
                 Columns recognized as identifiers are not used as anomaly
                 detection features.
               </p>
+
             </div>
 
           </div>
@@ -388,12 +413,14 @@ function AIAnalysis({ analysis, selectedDataset }) {
             </div>
 
             <div>
+
               <h3>Run Isolation Forest</h3>
 
               <p>
                 The model evaluates the eligible numeric data and identifies
                 records that appear unusual relative to the dataset.
               </p>
+
             </div>
 
           </div>
@@ -406,12 +433,14 @@ function AIAnalysis({ analysis, selectedDataset }) {
             </div>
 
             <div>
+
               <h3>Calculate Anomaly Scores</h3>
 
               <p>
                 Each detected anomalous row receives a model decision score
                 that is available on the Anomalies page.
               </p>
+
             </div>
 
           </div>
@@ -429,11 +458,13 @@ function AIAnalysis({ analysis, selectedDataset }) {
           <div className="ai-section-header">
 
             <div>
+
               <h2>Detected Anomalies</h2>
 
               <p>
                 Preview of rows identified by the machine-learning model.
               </p>
+
             </div>
 
           </div>
