@@ -8,12 +8,25 @@ import {
   useNavigate,
 } from "react-router-dom";
 
+import {
+  LayoutDashboard,
+  Upload as UploadIcon,
+  BarChart3,
+  PieChart,
+  LineChart,
+  Brain,
+  TriangleAlert,
+  MessageCircle,
+  Settings as SettingsIcon,
+} from "lucide-react";
+
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
 import Overview from "./pages/Overview";
+import AIChatbot from "./pages/AIChatbot";
 import Statistics from "./pages/Statistics";
 import Visualizations from "./pages/Visualizations";
 import AIAnalysis from "./pages/AIAnalysis";
@@ -1189,43 +1202,42 @@ function MainApplication() {
 
       <aside className="sidebar">
 
+        {/* =================================================
+            BRAND
+        ================================================= */}
 
         <div className="sidebar-brand">
-
 
           <div className="brand-icon">
             AI
           </div>
 
-
           <div>
 
             <h2>
-              CSV{" "}
+              Data{" "}
               <span className="gradient-text">
-                Analyzer
+                Pilot AI
               </span>
             </h2>
 
-
-            <div className="sidebar-brand-subtitle">
-              Intelligent Data Analysis
-            </div>
-
           </div>
-
 
         </div>
 
 
-        <nav className="sidebar-nav">
+        {/* =================================================
+            NAVIGATION
+        ================================================= */}
 
+        <nav className="sidebar-nav">
 
           <NavLink
             to="/dashboard"
             className="nav-item"
           >
-            Dashboard
+            <LayoutDashboard className="nav-icon" />
+            <span>Dashboard</span>
           </NavLink>
 
 
@@ -1233,15 +1245,21 @@ function MainApplication() {
             to="/upload"
             className="nav-item"
           >
-            Upload CSV
+            <UploadIcon className="nav-icon" />
+            <span>Upload CSV</span>
           </NavLink>
 
+          <NavLink to="/ai-chatbot" className="nav-item">
+              <MessageCircle className="nav-icon"/>
+              <span>AI Chatbot</span>
+          </NavLink>
 
           <NavLink
             to="/overview"
             className="nav-item"
           >
-            Overview
+            <BarChart3 className="nav-icon" />
+            <span>Overview</span>
           </NavLink>
 
 
@@ -1249,7 +1267,8 @@ function MainApplication() {
             to="/statistics"
             className="nav-item"
           >
-            Statistics
+            <PieChart className="nav-icon" />
+            <span>Statistics</span>
           </NavLink>
 
 
@@ -1257,7 +1276,8 @@ function MainApplication() {
             to="/visualizations"
             className="nav-item"
           >
-            Visualizations
+            <LineChart className="nav-icon" />
+            <span>Visualizations</span>
           </NavLink>
 
 
@@ -1265,7 +1285,8 @@ function MainApplication() {
             to="/ai-analysis"
             className="nav-item"
           >
-            AI Analysis
+            <Brain className="nav-icon" />
+            <span>AI Analysis</span>
           </NavLink>
 
 
@@ -1273,7 +1294,8 @@ function MainApplication() {
             to="/anomalies"
             className="nav-item"
           >
-            Anomalies
+            <TriangleAlert className="nav-icon" />
+            <span>Anomalies</span>
           </NavLink>
 
 
@@ -1281,25 +1303,22 @@ function MainApplication() {
             to="/settings"
             className="nav-item"
           >
-            Settings
+            <SettingsIcon className="nav-icon" />
+            <span>Settings</span>
           </NavLink>
-
 
         </nav>
 
 
+        {/* =================================================
+            SIDEBAR FOOTER
+        ================================================= */}
+
         <div className="sidebar-footer">
 
-
-          <span>
-            Universal CSV Analyzer
+          <span className="sidebar-tagline">
+            AI-Powered Data Analysis
           </span>
-
-
-          <span>
-            Python • Flask • React • AI
-          </span>
-
 
         </div>
 
@@ -1392,6 +1411,17 @@ function MainApplication() {
               />
 
             }
+          />
+          {/*==============================================
+             AI Chatbot 
+          ==================================================*/}
+           <Route 
+             path="/ai-chatbot"
+             element={
+              <ProtectedRoute>
+                <AIChatbot/>
+              </ProtectedRoute>
+             }
           />
 
 
@@ -1615,4 +1645,4 @@ function App() {
 }
 
 
-export default App;
+export default App; 
