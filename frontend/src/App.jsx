@@ -1415,14 +1415,16 @@ function MainApplication() {
           {/*==============================================
              AI Chatbot 
           ==================================================*/}
-           <Route 
-             path="/ai-chatbot"
-             element={
-              <ProtectedRoute>
-                <AIChatbot/>
-              </ProtectedRoute>
-             }
-          />
+          <Route 
+              path="/ai-chatbot"
+               element={
+            <ProtectedRoute>
+            <AIChatbot
+               selectedDataset={selectedDataset}
+           />
+           </ProtectedRoute>
+          }
+           />
 
 
           {/* =================================================
