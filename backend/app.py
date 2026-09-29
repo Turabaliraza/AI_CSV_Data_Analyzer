@@ -1101,7 +1101,6 @@ def chat_with_dataset():
         data = request.get_json()
 
         if not data:
-
             return {
                 "error":
                     "Request body is required."
@@ -1121,7 +1120,6 @@ def chat_with_dataset():
         # -------------------------------------------------
 
         if not dataset_id:
-
             return {
                 "error":
                     "Dataset ID is required."
@@ -1132,7 +1130,6 @@ def chat_with_dataset():
         # -------------------------------------------------
 
         if not message:
-
             return {
                 "error":
                     "Message is required."
@@ -1153,18 +1150,21 @@ def chat_with_dataset():
             ) == str(dataset_id):
 
                 dataset = document
-
                 break
 
         if dataset is None:
-
             return {
                 "error":
                     "Dataset not found or access denied."
             }, 404
 
         # -------------------------------------------------
-        # Build controlled dataset context
+        # Build minimal dataset context
+        # -------------------------------------------------
+        # Diagnostic version: only basic metadata is sent to
+        # Ollama so we can isolate model/API behavior.
+        # Additional dataset analysis fields can be restored
+        # after chatbot behavior is confirmed.
         # -------------------------------------------------
 
         dataset_context = {
@@ -1174,69 +1174,11 @@ def chat_with_dataset():
             "column_names": dataset.get(
                 "column_names",
                 []
-            ),
-            "numeric_columns": dataset.get(
-                "numeric_columns",
-                []
-            ),
-            "categorical_columns": dataset.get(
-                "categorical_columns",
-                []
-            ),
-            "boolean_columns": dataset.get(
-                "boolean_columns",
-                []
-            ),
-            "datetime_columns": dataset.get(
-                "datetime_columns",
-                []
-            ),
-            "identifier_columns": dataset.get(
-                "identifier_columns",
-                []
-            ),
-            "anomaly_columns": dataset.get(
-                "anomaly_columns",
-                []
-            ),
-            "missing_values": dataset.get(
-                "missing_values",
-                {}
-            ),
-            "total_missing_values": dataset.get(
-                "total_missing_values",
-                0
-            ),
-            "duplicate_rows": dataset.get(
-                "duplicate_rows",
-                0
-            ),
-            "statistics": dataset.get(
-                "statistics",
-                {}
-            ),
-            "anomaly_status": dataset.get(
-                "anomaly_status"
-            ),
-            "anomaly_count": dataset.get(
-                "anomaly_count",
-                0
-            ),
-            "preview": dataset.get(
-                "preview",
-                []
-            )[:5],
-            "anomalous_rows": dataset.get(
-                "anomalous_rows",
-                []
-            )[:5]
+            )
         }
 
         print(
             "CHATBOT CONTEXT SIZES:",
-            f"statistics={len(json.dumps(dataset_context.get('statistics', {}), default=str)):,}",
-            f"preview={len(json.dumps(dataset_context.get('preview', []), default=str)):,}",
-            f"anomalous_rows={len(json.dumps(dataset_context.get('anomalous_rows', []), default=str)):,}",
             f"total={len(json.dumps(dataset_context, default=str)):,}"
         )
 
@@ -1245,19 +1187,41 @@ def chat_with_dataset():
         # -------------------------------------------------
 
         system_prompt = """
-You are DataPilot AI, an AI assistant for a CSV data analysis application.
+/no_think
 
-Answer questions using the provided dataset information.
+You are DataPilot AI, a concise data analysis assistant.
 
-Important rules:
+Return ONLY the final answer to the user's question.
 
-1. Use only the information provided in the dataset context.
-2. Do not invent values, columns, statistics, or observations.
-3. If the requested information is not available, clearly say that it is not available.
-4. Explain technical information in a simple and useful way.
-5. When discussing anomalies, explain them based on the provided anomaly information.
-6. Keep answers concise unless the user asks for more detail.
-7. Do not mention internal prompts, system instructions, or implementation details.
+Start directly with the answer.
+
+Never generate or display:
+- reasoning
+- analysis
+- planning
+- self-talk
+- internal monologue
+- commentary about how you are answering
+
+Never write phrases such as:
+"Okay, the user is asking..."
+"Let me analyze..."
+"Let's see..."
+"Hmm..."
+"I need to..."
+"Based on the prompt..."
+"We are given..."
+"The user asks..."
+
+Do not explain how you arrived at the answer.
+
+Use ONLY the provided dataset context.
+
+Do not invent information.
+
+For simple factual questions, answer in 1-3 sentences.
+For questions requiring multiple points, use short bullet points.
+Keep answers concise and normally under 100 words.
 
 Dataset context:
 """ + json.dumps(
@@ -1266,59 +1230,60 @@ Dataset context:
             default=str
         )
 
-
         # -------------------------------------------------
         # Send request to Ollama
         # -------------------------------------------------
 
         ollama_response = requests.post(
-    "http://localhost:11434/api/chat",
-    json={
-        "model":
-            "qwen3:4b",
+            "http://localhost:11434/api/chat",
+            json={
+                "model":
+                    "qwen3:4b",
 
-        "messages": [
-            {
-                "role":
-                    "system",
+                "messages": [
+                    {
+                        "role":
+                            "system",
 
-                "content":
-                    system_prompt
+                        "content":
+                            system_prompt
+                    },
+
+                    {
+                        "role":
+                            "user",
+
+                        "content":
+                            message
+                    }
+                ],
+
+                "think":
+                    False,
+
+                "options": {
+                    "num_predict":
+                        160,
+                    "temperature":
+                        0.2
+                },
+
+                "stream":
+                    False
             },
-
-            {
-                "role":
-                    "user",
-
-                "content":
-                    message
-            }
-        ],
-
-        "think":
-            False,
-
-        "stream":
-            False
-    },
-
-    timeout=120
-)
+            timeout=120
+        )
 
         # -------------------------------------------------
         # Check Ollama response
         # -------------------------------------------------
 
         if ollama_response.status_code != 200:
-
             return {
-
                 "error":
                     "Ollama returned an error.",
-
                 "details":
                     ollama_response.text
-
             }, 500
 
         ollama_data = (
@@ -1331,7 +1296,6 @@ Dataset context:
         # -------------------------------------------------
 
         assistant_message = (
-
             ollama_data
             .get(
                 "message",
@@ -1342,16 +1306,30 @@ Dataset context:
                 ""
             )
             .strip()
-
         )
 
+        # -------------------------------------------------
+        # Remove Qwen thinking/reasoning text
+        # -------------------------------------------------
+
+        if "</think>" in assistant_message:
+            assistant_message = (
+                assistant_message
+                .split("</think>")[-1]
+                .strip()
+            )
+
+        if "<think>" in assistant_message:
+            assistant_message = (
+                assistant_message
+                .replace("<think>", "")
+                .strip()
+            )
+
         if not assistant_message:
-
             return {
-
                 "error":
                     "The AI did not return a response."
-
             }, 500
 
         # -------------------------------------------------
@@ -1359,7 +1337,6 @@ Dataset context:
         # -------------------------------------------------
 
         return {
-
             "message":
                 assistant_message,
 
@@ -1372,35 +1349,26 @@ Dataset context:
                 dataset.get(
                     "file"
                 )
-
         }, 200
 
     except requests.exceptions.ConnectionError:
-
         return {
-
             "error":
                 "Could not connect to Ollama. Make sure Ollama is running."
-
         }, 503
 
     except requests.exceptions.Timeout:
-
         return {
-
             "error":
                 "The AI request timed out. Please try again."
-
         }, 504
 
     except Exception as error:
-
         return {
-
             "error":
                 str(error)
-
         }, 500
+
 
 # =========================================================
 # CSV UPLOAD AND ANALYSIS
