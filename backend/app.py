@@ -1168,106 +1168,77 @@ def chat_with_dataset():
         # -------------------------------------------------
 
         dataset_context = {
-
-            "file":
-                dataset.get(
-                    "file"
-                ),
-
-            "rows":
-                dataset.get(
-                    "rows"
-                ),
-
-            "columns":
-                dataset.get(
-                    "columns"
-                ),
-
-            "column_names":
-                dataset.get(
-                    "column_names",
-                    []
-                ),
-
-            "numeric_columns":
-                dataset.get(
-                    "numeric_columns",
-                    []
-                ),
-
-            "categorical_columns":
-                dataset.get(
-                    "categorical_columns",
-                    []
-                ),
-
-            "boolean_columns":
-                dataset.get(
-                    "boolean_columns",
-                    []
-                ),
-
-            "datetime_columns":
-                dataset.get(
-                    "datetime_columns",
-                    []
-                ),
-
-            "identifier_columns":
-                dataset.get(
-                    "identifier_columns",
-                    []
-                ),
-
-            "missing_values":
-                dataset.get(
-                    "missing_values",
-                    {}
-                ),
-
-            "total_missing_values":
-                dataset.get(
-                    "total_missing_values",
-                    0
-                ),
-
-            "duplicate_rows":
-                dataset.get(
-                    "duplicate_rows",
-                    0
-                ),
-
-            "statistics":
-                dataset.get(
-                    "statistics",
-                    {}
-                ),
-
-            "anomaly_status":
-                dataset.get(
-                    "anomaly_status"
-                ),
-
-            "anomaly_count":
-                dataset.get(
-                    "anomaly_count",
-                    0
-                ),
-
-            "preview":
-                dataset.get(
-                    "preview",
-                    []
-                ),
-
-            "anomalous_rows":
-                dataset.get(
-                    "anomalous_rows",
-                    []
-                )
-
+            "file": dataset.get("file"),
+            "rows": dataset.get("rows"),
+            "columns": dataset.get("columns"),
+            "column_names": dataset.get(
+                "column_names",
+                []
+            ),
+            "numeric_columns": dataset.get(
+                "numeric_columns",
+                []
+            ),
+            "categorical_columns": dataset.get(
+                "categorical_columns",
+                []
+            ),
+            "boolean_columns": dataset.get(
+                "boolean_columns",
+                []
+            ),
+            "datetime_columns": dataset.get(
+                "datetime_columns",
+                []
+            ),
+            "identifier_columns": dataset.get(
+                "identifier_columns",
+                []
+            ),
+            "anomaly_columns": dataset.get(
+                "anomaly_columns",
+                []
+            ),
+            "missing_values": dataset.get(
+                "missing_values",
+                {}
+            ),
+            "total_missing_values": dataset.get(
+                "total_missing_values",
+                0
+            ),
+            "duplicate_rows": dataset.get(
+                "duplicate_rows",
+                0
+            ),
+            "statistics": dataset.get(
+                "statistics",
+                {}
+            ),
+            "anomaly_status": dataset.get(
+                "anomaly_status"
+            ),
+            "anomaly_count": dataset.get(
+                "anomaly_count",
+                0
+            ),
+            "preview": dataset.get(
+                "preview",
+                []
+            )[:5],
+            "anomalous_rows": dataset.get(
+                "anomalous_rows",
+                []
+            )[:5]
         }
+
+        print(
+            "CHATBOT CONTEXT SIZES:",
+            f"statistics={len(json.dumps(dataset_context.get('statistics', {}), default=str)):,}",
+            f"preview={len(json.dumps(dataset_context.get('preview', []), default=str)):,}",
+            f"anomalous_rows={len(json.dumps(dataset_context.get('anomalous_rows', []), default=str)):,}",
+            f"total={len(json.dumps(dataset_context, default=str)):,}"
+        )
 
         # -------------------------------------------------
         # Create prompt for Qwen3
@@ -1295,47 +1266,44 @@ Dataset context:
             default=str
         )
 
+
         # -------------------------------------------------
         # Send request to Ollama
         # -------------------------------------------------
 
         ollama_response = requests.post(
+    "http://localhost:11434/api/chat",
+    json={
+        "model":
+            "qwen3:4b",
 
-            "http://localhost:11434/api/chat",
+        "messages": [
+            {
+                "role":
+                    "system",
 
-            json={
-
-                "model":
-                    "qwen3:4b",
-
-                "messages": [
-
-                    {
-                        "role":
-                            "system",
-
-                        "content":
-                            system_prompt
-                    },
-
-                    {
-                        "role":
-                            "user",
-
-                        "content":
-                            message
-                    }
-
-                ],
-
-                "stream":
-                    False
-
+                "content":
+                    system_prompt
             },
 
-            timeout=120
+            {
+                "role":
+                    "user",
 
-        )
+                "content":
+                    message
+            }
+        ],
+
+        "think":
+            False,
+
+        "stream":
+            False
+    },
+
+    timeout=120
+)
 
         # -------------------------------------------------
         # Check Ollama response
