@@ -1167,13 +1167,49 @@ def chat_with_dataset():
         # after chatbot behavior is confirmed.
         # -------------------------------------------------
 
-        dataset_context = {
-            "file": dataset.get("file"),
-            "rows": dataset.get("rows"),
-            "columns": dataset.get("columns"),
-            "column_names": dataset.get(
+        dataset_context={
+            "file":dataset.get("file"),
+            "rows":dataset.get("rows"),
+            "columns":dataset.get("columns"),
+            "column_names":dataset.get(
                 "column_names",
                 []
+            ),
+            "missing_values":dataset.get(
+                "missing_values",
+                {}
+            ),
+            "total_missing_vaues":dataset.get(
+                "total_missing_values",
+                0
+            ),
+            "duplicate_rows":dataset.get(
+                "duplicate_rows",
+                []
+            ),
+            "numeric_columns":dataset.get(
+                "numeric_columns",
+                []
+            ),
+            "categorical_columns":dataset.get(
+                "categorical_columns",
+                []
+            ),
+            "identifier_columns":dataset.get(
+                "identifier_columns",
+                []
+            ),
+            "statistics":dataset.get(
+                "statistics",
+                {}
+            ),
+            "anomaly_status":dataset.get(
+                "anomaly_status",
+                "Not available"
+            ),
+            "anomaly_count":dataset.get(
+                "anomaly_count",
+                0
             )
         }
 
