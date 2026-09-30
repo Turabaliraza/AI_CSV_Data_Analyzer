@@ -1238,7 +1238,7 @@ Dataset context:
             "http://localhost:11434/api/chat",
             json={
                 "model":
-                    "qwen3:4b",
+                    "qwen3:4b-instruct-2507-q4_K_M",
 
                 "messages": [
                     {
