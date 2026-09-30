@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   MessageCircle,
   Database,
@@ -6,7 +6,12 @@ import {
   Sparkles,
 } from "lucide-react";
 
-function AIChatbot({ selectedDataset }) {
+function AIChatbot({
+  selectedDataset,
+  activeChatId,
+  newChatKey,
+  onChatCreated,
+}) {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -16,6 +21,105 @@ function AIChatbot({ selectedDataset }) {
   // -------------------------------------------------
 
   const [currentChatId, setCurrentChatId] = useState(null);
+
+  // -------------------------------------------------
+  // Load a saved conversation when the user selects
+  // one from the sidebar history.
+  // -------------------------------------------------
+
+  useEffect(() => {
+
+    let cancelled = false;
+
+    const loadSavedChat = async () => {
+
+      if (!activeChatId) {
+        setCurrentChatId(null);
+        setMessages([]);
+        setMessage("");
+        return;
+      }
+
+      setLoading(true);
+      setMessage("");
+
+      try {
+
+        const token =
+          localStorage.getItem(
+            "accessToken"
+          );
+
+        const response = await fetch(
+          `http://localhost:5000/api/chats/${activeChatId}`,
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Could not load the saved chat."
+          );
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        setCurrentChatId(data.id);
+        setMessages(
+          Array.isArray(data.messages)
+            ? data.messages
+            : []
+        );
+
+      } catch (error) {
+
+        if (cancelled) {
+          return;
+        }
+
+        console.error(
+          "Could not load saved chat:",
+          error
+        );
+
+        setCurrentChatId(null);
+        setMessages([
+          {
+            role: "assistant",
+            content:
+              error.message ||
+              "Could not load the saved conversation.",
+            isError: true,
+          },
+        ]);
+
+      } finally {
+
+        if (!cancelled) {
+          setLoading(false);
+        }
+
+      }
+
+    };
+
+    loadSavedChat();
+
+    return () => {
+      cancelled = true;
+    };
+
+  }, [activeChatId, newChatKey]);
 
   const datasetName =
     selectedDataset?.fileName ||
@@ -107,6 +211,10 @@ function AIChatbot({ selectedDataset }) {
         setCurrentChatId(
           data.chat_id
         );
+
+        if (onChatCreated) {
+          onChatCreated(data.chat_id);
+        }
       }
 
       setMessages((previous) => [

@@ -17,6 +17,10 @@ import {
   Brain,
   TriangleAlert,
   MessageCircle,
+  ChevronRight,
+  ChevronDown,
+  Plus,
+  MessageSquare,
   Settings as SettingsIcon,
 } from "lucide-react";
 
@@ -807,6 +811,122 @@ function MainApplication() {
 
 
   /* ---------------------------------------------------------
+     AI Chat history
+     --------------------------------------------------------- */
+
+  const [chatHistory, setChatHistory] =
+    useState([]);
+
+  const [isChatHistoryOpen, setIsChatHistoryOpen] =
+    useState(false);
+
+  const [activeChatId, setActiveChatId] =
+    useState(null);
+
+  const [newChatKey, setNewChatKey] =
+    useState(0);
+
+
+  /* ---------------------------------------------------------
+     Load saved AI chats from MongoDB
+     --------------------------------------------------------- */
+
+  const loadChatHistory = async () => {
+
+    try {
+
+      const response = await fetch(
+        "http://localhost:5000/api/chats",
+        {
+          headers: {
+            ...getAuthHeaders(),
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+          data.msg ||
+          "Could not load chat history."
+        );
+      }
+
+      setChatHistory(
+        Array.isArray(data) ? data : []
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Could not load AI chat history:",
+        error
+      );
+
+    }
+  };
+
+
+  /* ---------------------------------------------------------
+     New chat
+     --------------------------------------------------------- */
+
+  const handleNewChat = () => {
+
+    setActiveChatId(null);
+    setNewChatKey((value) => value + 1);
+
+    navigate(
+      "/ai-chatbot",
+      {
+        replace: false,
+      }
+    );
+
+  };
+
+
+  /* ---------------------------------------------------------
+     Open saved chat
+     --------------------------------------------------------- */
+
+  const handleOpenChat = (chat) => {
+
+    const chatDataset = datasetHistory.find(
+      (dataset) =>
+        String(dataset.id) ===
+        String(chat.dataset_id)
+    );
+
+    if (chatDataset) {
+      saveSelectedDataset(chatDataset);
+      setAnalysis(chatDataset.analysis);
+    }
+
+    setActiveChatId(chat.id);
+
+    navigate(
+      "/ai-chatbot",
+      {
+        replace: false,
+      }
+    );
+
+  };
+
+
+  /* ---------------------------------------------------------
+     Refresh chat history after a new message is saved
+     --------------------------------------------------------- */
+
+  const handleChatCreated = () => {
+    loadChatHistory();
+  };
+
+
+  /* ---------------------------------------------------------
      Load dataset history from MongoDB
      --------------------------------------------------------- */
 
@@ -1249,10 +1369,104 @@ function MainApplication() {
             <span>Upload CSV</span>
           </NavLink>
 
-          <NavLink to="/ai-chatbot" className="nav-item">
-              <MessageCircle className="nav-icon"/>
-              <span>AI Chatbot</span>
-          </NavLink>
+          <div className="chatbot-nav-wrapper">
+
+            <div className="chatbot-nav-row">
+
+              <NavLink
+                to="/ai-chatbot"
+                className="nav-item chatbot-nav-link"
+                onClick={handleNewChat}
+              >
+                <MessageCircle className="nav-icon" />
+                <span>AI Chatbot</span>
+              </NavLink>
+
+              <button
+                type="button"
+                className="chat-history-toggle"
+                onClick={() => {
+                  const nextState = !isChatHistoryOpen;
+                  setIsChatHistoryOpen(nextState);
+
+                  if (nextState) {
+                    loadChatHistory();
+                  }
+                }}
+                aria-label={
+                  isChatHistoryOpen
+                    ? "Collapse chat history"
+                    : "Expand chat history"
+                }
+                title={
+                  isChatHistoryOpen
+                    ? "Hide chat history"
+                    : "Show chat history"
+                }
+              >
+                {isChatHistoryOpen ? (
+                  <ChevronDown size={16} />
+                ) : (
+                  <ChevronRight size={16} />
+                )}
+              </button>
+
+            </div>
+
+
+            {isChatHistoryOpen && (
+
+              <div className="chat-history-panel">
+
+                <button
+                  type="button"
+                  className="chat-history-new"
+                  onClick={handleNewChat}
+                >
+                  <Plus size={15} />
+                  <span>New Chat</span>
+                </button>
+
+
+                {chatHistory.length === 0 ? (
+
+                  <div className="chat-history-empty">
+                    <MessageSquare size={15} />
+                    <span>No saved chats yet.</span>
+                  </div>
+
+                ) : (
+
+                  <div className="chat-history-list">
+                    {chatHistory.map((chat) => (
+
+                      <button
+                        key={chat.id}
+                        type="button"
+                        className={`chat-history-item ${
+                          activeChatId === chat.id
+                            ? "chat-history-item-active"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          handleOpenChat(chat)
+                        }
+                        title={chat.title}
+                      >
+                        <MessageSquare size={14} />
+                        <span>{chat.title}</span>
+                      </button>
+
+                    ))}
+                  </div>
+
+                )}
+
+              </div>
+
+            )}
+
+          </div>
 
           <NavLink
             to="/overview"
@@ -1421,6 +1635,9 @@ function MainApplication() {
             <ProtectedRoute>
             <AIChatbot
                selectedDataset={selectedDataset}
+               activeChatId={activeChatId}
+               newChatKey={newChatKey}
+               onChatCreated={handleChatCreated}
            />
            </ProtectedRoute>
           }
