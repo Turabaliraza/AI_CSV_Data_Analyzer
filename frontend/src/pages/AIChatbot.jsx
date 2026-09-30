@@ -11,6 +11,12 @@ function AIChatbot({ selectedDataset }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // -------------------------------------------------
+  // Current MongoDB chat ID
+  // -------------------------------------------------
+
+  const [currentChatId, setCurrentChatId] = useState(null);
+
   const datasetName =
     selectedDataset?.fileName ||
     selectedDataset?.file ||
@@ -56,21 +62,26 @@ function AIChatbot({ selectedDataset }) {
         "http://localhost:5000/api/chat",
         {
           method: "POST",
-
           headers: {
             "Content-Type":
               "application/json",
-
             Authorization:
               `Bearer ${token}`,
           },
-
           body: JSON.stringify({
             dataset_id:
               selectedDataset.id,
-
             message:
               trimmedMessage,
+
+            // Send the current chat ID when
+            // continuing an existing conversation.
+            ...(currentChatId
+              ? {
+                  chat_id:
+                    currentChatId,
+                }
+              : {}),
           }),
         }
       );
@@ -85,16 +96,27 @@ function AIChatbot({ selectedDataset }) {
         );
       }
 
+      // -------------------------------------------------
+      // Save the chat ID returned by the backend.
+      //
+      // The first message creates a new chat.
+      // Later messages continue using that same ID.
+      // -------------------------------------------------
+
+      if (data.chat_id) {
+        setCurrentChatId(
+          data.chat_id
+        );
+      }
+
       setMessages((previous) => [
         ...previous,
-
         {
           role: "assistant",
           content:
             data.message,
         },
       ]);
-
     } catch (error) {
       console.error(
         "Chat request failed:",
@@ -103,7 +125,6 @@ function AIChatbot({ selectedDataset }) {
 
       setMessages((previous) => [
         ...previous,
-
         {
           role: "assistant",
           content:
@@ -112,7 +133,6 @@ function AIChatbot({ selectedDataset }) {
           isError: true,
         },
       ]);
-
     } finally {
       setLoading(false);
     }
@@ -128,97 +148,62 @@ function AIChatbot({ selectedDataset }) {
 
   return (
     <div className="page-container chatbot-page">
-
       <div className="top-header chatbot-header">
         <div>
-
           <h1>
             AI{" "}
             <span className="gradient-text">
               Chatbot
             </span>
           </h1>
-
           <p>
             Ask questions about your selected
             dataset and get intelligent answers
             from DataPilot AI.
           </p>
-
         </div>
       </div>
 
-
       <div className="chatbot-workspace">
-
-        {/* =================================================
-            ASSISTANT HEADER
-        ================================================= */}
-
         <div className="chatbot-assistant">
-
           <div className="chatbot-assistant-icon">
             <Sparkles size={25} />
           </div>
-
           <h2>
             DataPilot AI
           </h2>
-
           <span>
             AI Data Assistant
           </span>
-
         </div>
 
-
-        {/* =================================================
-            DATASET
-        ================================================= */}
-
         <div className="chatbot-dataset-pill">
-
           <Database size={16} />
-
           <span className="dataset-pill-label">
             Dataset
           </span>
-
           <strong>
             {datasetName}
           </strong>
-
         </div>
 
-
-        {/* =================================================
-            CHAT CONTENT
-        ================================================= */}
-
         {messages.length === 0 ? (
-
           <>
             <div className="chatbot-welcome">
-
               <h3>
                 {hasDataset
                   ? `Let's explore ${datasetName}`
                   : "Welcome to DataPilot AI"}
               </h3>
-
               <p>
                 {hasDataset
                   ? "Ask me anything about your selected dataset. I can help you understand its structure, statistics, missing values, anomalies, and more."
                   : "Select a dataset from Upload CSV first, then come here to ask questions about your data."}
               </p>
-
             </div>
 
-
             {hasDataset && (
-
               <div className="chatbot-suggestions">
-
                 <button
                   type="button"
                   onClick={() =>
@@ -229,7 +214,6 @@ function AIChatbot({ selectedDataset }) {
                 >
                   What does this dataset contain?
                 </button>
-
                 <button
                   type="button"
                   onClick={() =>
@@ -240,7 +224,6 @@ function AIChatbot({ selectedDataset }) {
                 >
                   Are there any missing values?
                 </button>
-
                 <button
                   type="button"
                   onClick={() =>
@@ -251,20 +234,13 @@ function AIChatbot({ selectedDataset }) {
                 >
                   Explain the detected anomalies.
                 </button>
-
               </div>
-
             )}
-
           </>
-
         ) : (
-
           <div className="chatbot-messages">
-
             {messages.map(
               (chatMessage, index) => (
-
                 <div
                   key={index}
                   className={`chat-message ${
@@ -273,9 +249,7 @@ function AIChatbot({ selectedDataset }) {
                       : "assistant-message"
                   }`}
                 >
-
                   <div className="chat-message-icon">
-
                     {chatMessage.role ===
                     "user" ? (
                       <MessageCircle
@@ -286,9 +260,7 @@ function AIChatbot({ selectedDataset }) {
                         size={16}
                       />
                     )}
-
                   </div>
-
                   <div
                     className={
                       chatMessage.isError
@@ -298,46 +270,29 @@ function AIChatbot({ selectedDataset }) {
                   >
                     {chatMessage.content}
                   </div>
-
                 </div>
-
               )
             )}
 
             {loading && (
-
               <div className="chat-message assistant-message">
-
                 <div className="chat-message-icon">
                   <Sparkles size={16} />
                 </div>
-
                 <div className="chat-message-content">
                   DataPilot AI is thinking...
                 </div>
-
               </div>
-
             )}
-
           </div>
-
         )}
 
-
-        {/* =================================================
-            INPUT
-        ================================================= */}
-
         <div className="chatbot-input-wrapper">
-
           <div className="chatbot-input">
-
             <MessageCircle
               size={19}
               className="chatbot-input-icon"
             />
-
             <input
               type="text"
               value={message}
@@ -347,13 +302,11 @@ function AIChatbot({ selectedDataset }) {
                 )
               }
               onKeyDown={(event) => {
-
                 if (
                   event.key === "Enter"
                 ) {
                   handleSend();
                 }
-
               }}
               placeholder={
                 hasDataset
@@ -365,7 +318,6 @@ function AIChatbot({ selectedDataset }) {
                 loading
               }
             />
-
             <button
               type="button"
               className="chatbot-send-button"
@@ -379,18 +331,13 @@ function AIChatbot({ selectedDataset }) {
             >
               <Send size={18} />
             </button>
-
           </div>
-
           <span className="chatbot-input-note">
             DataPilot AI answers questions using
             your selected dataset.
           </span>
-
         </div>
-
       </div>
-
     </div>
   );
 }

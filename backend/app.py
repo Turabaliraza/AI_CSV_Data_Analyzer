@@ -23,6 +23,7 @@ import requests
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
+from bson import ObjectId
 from datetime import datetime,timezone 
 
 
@@ -43,6 +44,7 @@ db=client["ai_csv_analyzer"]
 
 users_collection=db["users"]
 datasets_collection=db["datasets"]
+chats_collection=db["chats"]
 
 #=====================================
 # JWT Configuration
@@ -89,6 +91,27 @@ try:
     )
 except Exception as error:
     print("MongoDB user index setup warning:", error)
+
+
+# =========================================================
+# CHAT INDEX
+# =========================================================
+
+try:
+
+    chats_collection.create_index(
+        [
+            ("user_id", 1),
+            ("updated_at", -1)
+        ]
+    )
+
+except Exception as error:
+
+    print(
+        "MongoDB chat index setup warning:",
+        error
+    )
 
 
 # =========================================================
@@ -1076,6 +1099,169 @@ def get_datasets():
                 str(error)
         }, 500
 # =========================================================
+# GET SAVED AI CHATS
+# =========================================================
+
+@app.route(
+    "/api/chats",
+    methods=["GET"]
+)
+@jwt_required()
+def get_chats():
+
+    try:
+
+        user_id = get_jwt_identity()
+
+        chats = chats_collection.find({
+            "user_id": user_id
+        }).sort(
+            "updated_at",
+            -1
+        )
+
+        result = []
+
+        for chat in chats:
+
+            result.append({
+
+                "id":
+                    str(chat["_id"]),
+
+                "dataset_id":
+                    str(chat["dataset_id"]),
+
+                "title": chat.get(
+                    "title",
+                    "New Chat"
+                ),
+
+                "created_at": (
+                    chat["created_at"].isoformat()
+                    if isinstance(
+                        chat.get("created_at"),
+                        datetime
+                    )
+                    else chat.get("created_at")
+                ),
+
+                "updated_at": (
+                    chat["updated_at"].isoformat()
+                    if isinstance(
+                        chat.get("updated_at"),
+                        datetime
+                    )
+                    else chat.get("updated_at")
+                )
+
+            })
+
+        return result
+
+    except Exception as error:
+
+        return {
+            "error": str(error)
+        }, 500
+
+
+# =========================================================
+# GET ONE AI CHAT
+# =========================================================
+
+@app.route(
+    "/api/chats/<chat_id>",
+    methods=["GET"]
+)
+@jwt_required()
+def get_chat(chat_id):
+
+    try:
+
+        user_id = get_jwt_identity()
+
+        try:
+
+            chat_object_id = ObjectId(
+                chat_id
+            )
+
+        except Exception:
+
+            return {
+                "error":
+                    "Invalid chat ID."
+            }, 400
+
+        chat = chats_collection.find_one({
+
+            "_id":
+                chat_object_id,
+
+            "user_id":
+                user_id
+
+        })
+
+        if chat is None:
+
+            return {
+                "error":
+                    "Chat not found or access denied."
+            }, 404
+
+        return {
+
+            "id":
+                str(chat["_id"]),
+
+            "user_id":
+                chat["user_id"],
+
+            "dataset_id":
+                str(chat["dataset_id"]),
+
+            "title":
+                chat.get(
+                    "title",
+                    "New Chat"
+                ),
+
+            "messages":
+                chat.get(
+                    "messages",
+                    []
+                ),
+
+            "created_at": (
+                chat["created_at"].isoformat()
+                if isinstance(
+                    chat.get("created_at"),
+                    datetime
+                )
+                else chat.get("created_at")
+            ),
+
+            "updated_at": (
+                chat["updated_at"].isoformat()
+                if isinstance(
+                    chat.get("updated_at"),
+                    datetime
+                )
+                else chat.get("updated_at")
+            )
+
+        }
+
+    except Exception as error:
+
+        return {
+            "error": str(error)
+        }, 500
+
+
+# =========================================================
 # AI CHATBOT API
 # =========================================================
 
@@ -1114,6 +1300,10 @@ def chat_with_dataset():
             "message",
             ""
         ).strip()
+
+        chat_id = data.get(
+            "chat_id"
+        )
 
         # -------------------------------------------------
         # Validate dataset ID
@@ -1159,7 +1349,59 @@ def chat_with_dataset():
             }, 404
 
         # -------------------------------------------------
-        # Build minimal dataset context
+        # Find existing chat if chat_id was provided
+        # -------------------------------------------------
+
+        chat = None
+
+        if chat_id:
+
+            try:
+
+                chat_object_id = ObjectId(
+                    chat_id
+                )
+
+            except Exception:
+
+                return {
+                    "error":
+                        "Invalid chat ID."
+                }, 400
+
+            chat = chats_collection.find_one({
+
+                "_id":
+                    chat_object_id,
+
+                "user_id":
+                    user_id,
+
+                "dataset_id":
+                    dataset["_id"]
+
+            })
+
+            if chat is None:
+
+                return {
+                    "error":
+                        "Chat not found or access denied."
+                }, 404
+        # -------------------------------------------------
+        # Get previous messages from existing chat
+        # -------------------------------------------------
+
+        previous_messages = []
+
+        if chat:
+            previous_messages = chat.get(
+                "messages",
+                []
+            )
+
+        # -------------------------------------------------
+        # Build dataset context
         # -------------------------------------------------
         # Diagnostic version: only basic metadata is sent to
         # Ollama so we can isolate model/API behavior.
@@ -1167,47 +1409,47 @@ def chat_with_dataset():
         # after chatbot behavior is confirmed.
         # -------------------------------------------------
 
-        dataset_context={
-            "file":dataset.get("file"),
-            "rows":dataset.get("rows"),
-            "columns":dataset.get("columns"),
-            "column_names":dataset.get(
+        dataset_context = {
+            "file": dataset.get("file"),
+            "rows": dataset.get("rows"),
+            "columns": dataset.get("columns"),
+            "column_names": dataset.get(
                 "column_names",
                 []
             ),
-            "missing_values":dataset.get(
+            "missing_values": dataset.get(
                 "missing_values",
                 {}
             ),
-            "total_missing_vaues":dataset.get(
+            "total_missing_values": dataset.get(
                 "total_missing_values",
                 0
             ),
-            "duplicate_rows":dataset.get(
+            "duplicate_rows": dataset.get(
                 "duplicate_rows",
-                []
+                0
             ),
-            "numeric_columns":dataset.get(
+            "numeric_columns": dataset.get(
                 "numeric_columns",
                 []
             ),
-            "categorical_columns":dataset.get(
+            "categorical_columns": dataset.get(
                 "categorical_columns",
                 []
             ),
-            "identifier_columns":dataset.get(
+            "identifier_columns": dataset.get(
                 "identifier_columns",
                 []
             ),
-            "statistics":dataset.get(
+            "statistics": dataset.get(
                 "statistics",
                 {}
             ),
-            "anomaly_status":dataset.get(
+            "anomaly_status": dataset.get(
                 "anomaly_status",
                 "Not available"
             ),
-            "anomaly_count":dataset.get(
+            "anomaly_count": dataset.get(
                 "anomaly_count",
                 0
             )
@@ -1266,6 +1508,30 @@ Dataset context:
             default=str
         )
 
+        #-------------------------------------------------
+        # Build Ollama conversation 
+        #-------------------------------------------------
+
+        ollama_messages=[
+            {
+                "role":
+                   "system",
+                "content":
+                    system_prompt
+            }
+        ]
+
+        ollama_messages.extend(
+            previous_messages
+        )
+
+        ollama_messages.append({
+            "role":
+               "user",
+            "content":
+                message 
+        })
+
         # -------------------------------------------------
         # Send request to Ollama
         # -------------------------------------------------
@@ -1276,23 +1542,10 @@ Dataset context:
                 "model":
                     "qwen3:4b-instruct-2507-q4_K_M",
 
-                "messages": [
-                    {
-                        "role":
-                            "system",
+                
 
-                        "content":
-                            system_prompt
-                    },
-
-                    {
-                        "role":
-                            "user",
-
-                        "content":
-                            message
-                    }
-                ],
+                "messages":
+                    ollama_messages,
 
                 "think":
                     False,
@@ -1369,12 +1622,97 @@ Dataset context:
             }, 500
 
         # -------------------------------------------------
+        # Save chat messages to MongoDB
+        # -------------------------------------------------
+
+        now = datetime.now(timezone.utc)
+
+        user_chat_message = {
+            "role":
+                "user",
+            "content":
+                message
+        }
+
+        assistant_chat_message = {
+            "role":
+                "assistant",
+            "content":
+                assistant_message
+        }
+
+        if chat is None:
+
+            chat_title = message
+
+            if len(chat_title) > 60:
+                chat_title = (
+                    chat_title[:60].rstrip()
+                    + "..."
+                )
+
+            chat_document = {
+                "user_id":
+                    user_id,
+                "dataset_id":
+                    dataset["_id"],
+                "title":
+                    chat_title,
+                "messages": [
+                    user_chat_message,
+                    assistant_chat_message
+                ],
+                "created_at":
+                    now,
+                "updated_at":
+                    now
+            }
+
+            insert_result = chats_collection.insert_one(
+                chat_document
+            )
+
+            saved_chat_id = insert_result.inserted_id
+
+        else:
+
+            chats_collection.update_one(
+                {
+                    "_id":
+                        chat["_id"],
+                    "user_id":
+                        user_id,
+                    "dataset_id":
+                        dataset["_id"]
+                },
+                {
+                    "$push": {
+                        "messages": {
+                            "$each": [
+                                user_chat_message,
+                                assistant_chat_message
+                            ]
+                        }
+                    },
+                    "$set": {
+                        "updated_at":
+                            now
+                    }
+                }
+            )
+
+            saved_chat_id = chat["_id"]
+
+        # -------------------------------------------------
         # Return response to React
         # -------------------------------------------------
 
         return {
             "message":
                 assistant_message,
+
+            "chat_id":
+                str(saved_chat_id),
 
             "dataset_id":
                 str(
