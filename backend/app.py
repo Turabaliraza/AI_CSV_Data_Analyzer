@@ -1260,6 +1260,251 @@ def get_chat(chat_id):
             "error": str(error)
         }, 500
 
+# =========================================================
+# RENAME AI CHAT
+# =========================================================
+
+@app.route(
+    "/api/chats/<chat_id>",
+    methods=["PATCH"]
+)
+@jwt_required()
+def rename_chat(chat_id):
+
+    try:
+
+        # -------------------------------------------------
+        # Get authenticated user
+        # -------------------------------------------------
+
+        user_id = get_jwt_identity()
+
+        # -------------------------------------------------
+        # Validate chat ID
+        # -------------------------------------------------
+
+        try:
+
+            chat_object_id = ObjectId(
+                chat_id
+            )
+
+        except Exception:
+
+            return {
+                "error":
+                    "Invalid chat ID."
+            }, 400
+
+        # -------------------------------------------------
+        # Get request data
+        # -------------------------------------------------
+
+        data = request.get_json()
+
+        if not data:
+
+            return {
+                "error":
+                    "Request body is required."
+            }, 400
+
+        title = data.get(
+            "title",
+            ""
+        ).strip()
+
+        # -------------------------------------------------
+        # Validate title
+        # -------------------------------------------------
+
+        if not title:
+
+            return {
+                "error":
+                    "Chat title is required."
+            }, 400
+
+        if len(title) > 100:
+
+            return {
+                "error":
+                    "Chat title cannot exceed 100 characters."
+            }, 400
+
+        # -------------------------------------------------
+        # Update chat
+        # -------------------------------------------------
+
+        result = chats_collection.update_one(
+            {
+                "_id":
+                    chat_object_id,
+
+                "user_id":
+                    user_id
+            },
+            {
+                "$set": {
+                    "title":
+                        title,
+
+                    "updated_at":
+                        datetime.now(timezone.utc)
+                }
+            }
+        )
+
+        # -------------------------------------------------
+        # Check whether chat exists
+        # -------------------------------------------------
+
+        if result.matched_count == 0:
+
+            return {
+                "error":
+                    "Chat not found or access denied."
+            }, 404
+
+        # -------------------------------------------------
+        # Return updated chat
+        # -------------------------------------------------
+
+        updated_chat = chats_collection.find_one(
+            {
+                "_id":
+                    chat_object_id,
+
+                "user_id":
+                    user_id
+            }
+        )
+
+        return {
+            "message":
+                "Chat renamed successfully.",
+
+            "chat": {
+                "id":
+                    str(updated_chat["_id"]),
+
+                "dataset_id":
+                    str(updated_chat["dataset_id"]),
+
+                "title":
+                    updated_chat.get(
+                        "title",
+                        "New Chat"
+                    ),
+
+                "created_at": (
+                    updated_chat["created_at"].isoformat()
+                    if isinstance(
+                        updated_chat.get("created_at"),
+                        datetime
+                    )
+                    else updated_chat.get("created_at")
+                ),
+
+                "updated_at": (
+                    updated_chat["updated_at"].isoformat()
+                    if isinstance(
+                        updated_chat.get("updated_at"),
+                        datetime
+                    )
+                    else updated_chat.get("updated_at")
+                )
+            }
+
+        }, 200
+
+    except Exception as error:
+
+        return {
+            "error":
+                str(error)
+        }, 500
+
+
+# =========================================================
+# DELETE AI CHAT
+# =========================================================
+
+@app.route(
+    "/api/chats/<chat_id>",
+    methods=["DELETE"]
+)
+@jwt_required()
+def delete_chat(chat_id):
+
+    try:
+
+        # -------------------------------------------------
+        # Get authenticated user
+        # -------------------------------------------------
+
+        user_id = get_jwt_identity()
+
+        # -------------------------------------------------
+        # Validate chat ID
+        # -------------------------------------------------
+
+        try:
+
+            chat_object_id = ObjectId(
+                chat_id
+            )
+
+        except Exception:
+
+            return {
+                "error":
+                    "Invalid chat ID."
+            }, 400
+
+        # -------------------------------------------------
+        # Delete chat
+        # -------------------------------------------------
+
+        result = chats_collection.delete_one(
+            {
+                "_id":
+                    chat_object_id,
+
+                "user_id":
+                    user_id
+            }
+        )
+
+        # -------------------------------------------------
+        # Check whether chat existed
+        # -------------------------------------------------
+
+        if result.deleted_count == 0:
+
+            return {
+                "error":
+                    "Chat not found or access denied."
+            }, 404
+
+        # -------------------------------------------------
+        # Return success
+        # -------------------------------------------------
+
+        return {
+            "message":
+                "Chat deleted successfully.",
+
+            "chat_id":
+                chat_id
+        }, 200
+
+    except Exception as error:
+
+        return {
+            "error":
+                str(error)
+        }, 500
 
 # =========================================================
 # AI CHATBOT API
