@@ -21,10 +21,6 @@ import {
   ChevronDown,
   Plus,
   MessageSquare,
-  MoreVertical,
-  Pencil,
-  Trash2,
-  X,
   Settings as SettingsIcon,
 } from "lucide-react";
 
@@ -39,9 +35,14 @@ import Statistics from "./pages/Statistics";
 import Visualizations from "./pages/Visualizations";
 import AIAnalysis from "./pages/AIAnalysis";
 import Anomalies from "./pages/Anomalies";
+import pilotLogo from "./assets/pilot.png";
 
 import "./App.css";
 
+
+/* =========================================================
+   AUTHENTICATED API HELPER
+   ========================================================= */
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("accessToken");
@@ -54,6 +55,10 @@ const getAuthHeaders = () => {
 };
 
 
+/* =========================================================
+   PROTECTED ROUTE
+   ========================================================= */
+
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("accessToken");
 
@@ -64,6 +69,11 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+
+/* =========================================================
+   AUTH ROUTE
+   Prevent logged-in users from opening login/register
+   ========================================================= */
 
 function AuthRoute({ children }) {
   const token = localStorage.getItem("accessToken");
@@ -76,12 +86,20 @@ function AuthRoute({ children }) {
 }
 
 
+/* =========================================================
+   SETTINGS PAGE
+   ========================================================= */
+
 function Settings() {
   const navigate = useNavigate();
 
   const [remainingSeconds, setRemainingSeconds] = useState(null);
   const [sessionDuration, setSessionDuration] = useState(null);
 
+
+  /* ---------------------------------------------------------
+     Get current user
+     --------------------------------------------------------- */
 
   const getCurrentUser = () => {
     try {
@@ -108,6 +126,10 @@ function Settings() {
 
   const currentUser = getCurrentUser();
 
+
+  /* ---------------------------------------------------------
+     Read JWT expiration and run countdown
+     --------------------------------------------------------- */
 
   useEffect(() => {
 
@@ -144,6 +166,13 @@ function Settings() {
 
         }
 
+
+        /*
+          Decode the JWT payload.
+
+          JWT payloads use Base64URL encoding,
+          so convert it into normal Base64 first.
+        */
 
         const base64Payload =
           tokenParts[1]
@@ -192,6 +221,13 @@ function Settings() {
         );
 
 
+        /*
+          Calculate the original session duration.
+
+          JWT `iat` = issued-at timestamp.
+          JWT `exp` = expiration timestamp.
+        */
+
         if (payload.iat) {
 
           const totalDuration =
@@ -207,6 +243,11 @@ function Settings() {
 
         }
 
+
+        /*
+          Automatically log out when
+          the JWT reaches zero.
+        */
 
         if (remaining <= 0) {
 
@@ -251,8 +292,16 @@ function Settings() {
     };
 
 
+    /*
+      Calculate immediately when Settings loads.
+    */
+
     calculateRemainingTime();
 
+
+    /*
+      Update countdown every second.
+    */
 
     const timer =
       setInterval(
@@ -266,6 +315,10 @@ function Settings() {
 
   }, [navigate]);
 
+
+  /* ---------------------------------------------------------
+     Format remaining time
+     --------------------------------------------------------- */
 
   const formatRemainingTime = () => {
 
@@ -294,6 +347,11 @@ function Settings() {
       remainingSeconds % 60;
 
 
+    /*
+      Show HH:MM:SS for longer sessions.
+      Show MM:SS for normal sessions.
+    */
+
     if (hours > 0) {
 
       return `${String(hours).padStart(
@@ -321,6 +379,10 @@ function Settings() {
   };
 
 
+  /* ---------------------------------------------------------
+     Session progress
+     --------------------------------------------------------- */
+
   const getSessionProgress = () => {
 
     if (
@@ -345,6 +407,10 @@ function Settings() {
 
   };
 
+
+  /* ---------------------------------------------------------
+     Logout
+     --------------------------------------------------------- */
 
   const handleLogout = () => {
 
@@ -378,6 +444,10 @@ function Settings() {
   };
 
 
+  /* ---------------------------------------------------------
+     Session timer warning
+     --------------------------------------------------------- */
+
   const isSessionWarning =
     remainingSeconds !== null &&
     remainingSeconds <= 60;
@@ -386,6 +456,11 @@ function Settings() {
   return (
 
     <div className="page-container">
+
+
+      {/* =================================================
+          PAGE HEADER
+      ================================================= */}
 
       <div className="top-header">
 
@@ -405,6 +480,10 @@ function Settings() {
 
         </div>
 
+
+        {/* =================================================
+            CURRENT USER
+        ================================================= */}
 
         {currentUser && (
 
@@ -438,6 +517,10 @@ function Settings() {
 
       <div className="settings-content">
 
+
+        {/* =================================================
+            ACCOUNT INFORMATION
+        ================================================= */}
 
         <div className="dashboard-card settings-card">
 
@@ -507,6 +590,10 @@ function Settings() {
         </div>
 
 
+        {/* =================================================
+            SESSION MANAGEMENT
+        ================================================= */}
+
         <div className="dashboard-card settings-card session-card">
 
           <div className="card-header">
@@ -522,6 +609,10 @@ function Settings() {
             You are currently signed in to AI CSV Analyzer.
           </p>
 
+
+          {/* =================================================
+              ACTIVE SESSION
+          ================================================= */}
 
           <div className="active-session">
 
@@ -561,6 +652,10 @@ function Settings() {
 
           </div>
 
+
+          {/* =================================================
+              EXPIRATION TIMER
+          ================================================= */}
 
           <div className="session-expiration">
 
@@ -613,6 +708,10 @@ function Settings() {
           </div>
 
 
+          {/* =================================================
+              LOGOUT
+          ================================================= */}
+
           <button
             type="button"
             className="logout-button"
@@ -639,6 +738,10 @@ function Settings() {
           </button>
 
 
+          {/* =================================================
+              SECURITY NOTE
+          ================================================= */}
+
           <div className="security-note">
 
             <span>
@@ -662,27 +765,55 @@ function Settings() {
 }
 
 
+/* =========================================================
+   MAIN APPLICATION
+   ========================================================= */
+
 function MainApplication() {
+
+  /* ---------------------------------------------------------
+     Dataset history
+     --------------------------------------------------------- */
 
   const [datasetHistory, setDatasetHistory] =
     useState([]);
 
 
+  /* ---------------------------------------------------------
+     Current selected dataset
+     --------------------------------------------------------- */
+
   const [selectedDataset, setSelectedDataset] =
     useState(null);
 
+
+  /* ---------------------------------------------------------
+     Current uploaded file
+     --------------------------------------------------------- */
 
   const [file, setFile] =
     useState(null);
 
 
+  /* ---------------------------------------------------------
+     Current analysis
+     --------------------------------------------------------- */
+
   const [analysis, setAnalysis] =
     useState(null);
 
 
+  /* ---------------------------------------------------------
+     Status / upload message
+     --------------------------------------------------------- */
+
   const [message, setMessage] =
     useState("");
 
+
+  /* ---------------------------------------------------------
+     AI Chat history
+     --------------------------------------------------------- */
 
   const [chatHistory, setChatHistory] =
     useState([]);
@@ -696,15 +827,10 @@ function MainApplication() {
   const [newChatKey, setNewChatKey] =
     useState(0);
 
-  const [chatMenuId, setChatMenuId] =
-    useState(null);
 
-  const [editingChatId, setEditingChatId] =
-    useState(null);
-
-  const [editingChatTitle, setEditingChatTitle] =
-    useState("");
-
+  /* ---------------------------------------------------------
+     Load saved AI chats from MongoDB
+     --------------------------------------------------------- */
 
   const loadChatHistory = async () => {
 
@@ -744,10 +870,11 @@ function MainApplication() {
   };
 
 
-  const handleNewChat = () => {
+  /* ---------------------------------------------------------
+     New chat
+     --------------------------------------------------------- */
 
-    setChatMenuId(null);
-    handleCancelRename();
+  const handleNewChat = () => {
 
     setActiveChatId(null);
     setNewChatKey((value) => value + 1);
@@ -762,10 +889,11 @@ function MainApplication() {
   };
 
 
-  const handleOpenChat = (chat) => {
+  /* ---------------------------------------------------------
+     Open saved chat
+     --------------------------------------------------------- */
 
-    setChatMenuId(null);
-    handleCancelRename();
+  const handleOpenChat = (chat) => {
 
     const chatDataset = datasetHistory.find(
       (dataset) =>
@@ -790,159 +918,18 @@ function MainApplication() {
   };
 
 
+  /* ---------------------------------------------------------
+     Refresh chat history after a new message is saved
+     --------------------------------------------------------- */
+
   const handleChatCreated = () => {
     loadChatHistory();
   };
 
 
-  const handleStartRename = (chat) => {
-    setChatMenuId(null);
-    setEditingChatId(chat.id);
-    setEditingChatTitle(chat.title || "");
-  };
-
-
-  const handleCancelRename = () => {
-    setEditingChatId(null);
-    setEditingChatTitle("");
-  };
-
-
-  const handleRenameChat = async (chatId) => {
-    const trimmedTitle = editingChatTitle.trim();
-
-    if (!trimmedTitle) {
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `http://localhost:5000/api/chats/${chatId}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            ...getAuthHeaders(),
-          },
-          body: JSON.stringify({
-            title: trimmedTitle,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-          data.msg ||
-          "Could not rename the chat."
-        );
-      }
-
-      setChatHistory((previousHistory) =>
-        previousHistory.map((chat) =>
-          chat.id === chatId
-            ? {
-                ...chat,
-                title:
-                  data.chat?.title ||
-                  trimmedTitle,
-                updated_at:
-                  data.chat?.updated_at ||
-                  chat.updated_at,
-              }
-            : chat
-        )
-      );
-
-      handleCancelRename();
-
-    } catch (error) {
-
-      console.error(
-        "Could not rename AI chat:",
-        error
-      );
-
-      window.alert(
-        error.message ||
-        "Could not rename the chat."
-      );
-
-    }
-  };
-
-
-  const handleDeleteChat = async (chat) => {
-
-    setChatMenuId(null);
-
-    const confirmed = window.confirm(
-      `Delete "${chat.title}"? This conversation will be permanently deleted.`
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-
-      const response = await fetch(
-        `http://localhost:5000/api/chats/${chat.id}`,
-        {
-          method: "DELETE",
-          headers: {
-            ...getAuthHeaders(),
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-          data.msg ||
-          "Could not delete the chat."
-        );
-      }
-
-      setChatHistory((previousHistory) =>
-        previousHistory.filter(
-          (item) => item.id !== chat.id
-        )
-      );
-
-      if (activeChatId === chat.id) {
-
-        setActiveChatId(null);
-        setNewChatKey((value) => value + 1);
-
-        navigate(
-          "/ai-chatbot",
-          {
-            replace: false,
-          }
-        );
-
-      }
-
-    } catch (error) {
-
-      console.error(
-        "Could not delete AI chat:",
-        error
-      );
-
-      window.alert(
-        error.message ||
-        "Could not delete the chat."
-      );
-
-    }
-  };
-
+  /* ---------------------------------------------------------
+     Load dataset history from MongoDB
+     --------------------------------------------------------- */
 
   useEffect(() => {
 
@@ -1027,10 +1014,21 @@ function MainApplication() {
         );
 
 
+        /*
+          MongoDB is the source of truth.
+
+          The old localStorage dataset history
+          is no longer used.
+        */
+
         localStorage.removeItem(
           "csvAnalysisHistory"
         );
 
+
+        /*
+          Restore previously selected dataset.
+        */
 
         const savedSelectedId =
           localStorage.getItem(
@@ -1085,6 +1083,10 @@ function MainApplication() {
   }, []);
 
 
+  /* ---------------------------------------------------------
+     Helper: save selected dataset ID
+     --------------------------------------------------------- */
+
   const saveSelectedDataset = (
     dataset
   ) => {
@@ -1112,6 +1114,10 @@ function MainApplication() {
   };
 
 
+  /* ---------------------------------------------------------
+     Analyze / load CSV
+     --------------------------------------------------------- */
+
   const handleUpload = async () => {
 
     if (!file) {
@@ -1124,6 +1130,11 @@ function MainApplication() {
 
     }
 
+
+    /*
+      MongoDB is the source of truth
+      for dataset identity.
+    */
 
     const formData =
       new FormData();
@@ -1173,6 +1184,11 @@ function MainApplication() {
 
       }
 
+
+      /*
+        The backend should return
+        the MongoDB document ID.
+      */
 
       if (!data._id) {
 
@@ -1226,6 +1242,13 @@ function MainApplication() {
         dataset
       );
 
+
+      /*
+        Update the in-memory history.
+
+        Existing dataset is replaced instead
+        of creating another history entry.
+      */
 
       setDatasetHistory(
         (previousHistory) => {
@@ -1283,18 +1306,31 @@ function MainApplication() {
   };
 
 
+  /*
+    =========================================================
+    DASHBOARD SHELL
+    =========================================================
+  */
+
   return (
 
     <div className="app">
 
 
+      {/* =================================================
+          SIDEBAR
+      ================================================= */}
+
       <aside className="sidebar">
 
+        {/* =================================================
+            BRAND
+        ================================================= */}
 
         <div className="sidebar-brand">
 
           <div className="brand-icon">
-            AI
+              <img src={pilotLogo} alt="Data Pilot AI" />
           </div>
 
           <div>
@@ -1310,6 +1346,10 @@ function MainApplication() {
 
         </div>
 
+
+        {/* =================================================
+            NAVIGATION
+        ================================================= */}
 
         <nav className="sidebar-nav">
 
@@ -1330,7 +1370,6 @@ function MainApplication() {
             <span>Upload CSV</span>
           </NavLink>
 
-
           <div className="chatbot-nav-wrapper">
 
             <div className="chatbot-nav-row">
@@ -1344,23 +1383,16 @@ function MainApplication() {
                 <span>AI Chatbot</span>
               </NavLink>
 
-
               <button
                 type="button"
                 className="chat-history-toggle"
                 onClick={() => {
-
-                  const nextState =
-                    !isChatHistoryOpen;
-
-                  setIsChatHistoryOpen(
-                    nextState
-                  );
+                  const nextState = !isChatHistoryOpen;
+                  setIsChatHistoryOpen(nextState);
 
                   if (nextState) {
                     loadChatHistory();
                   }
-
                 }}
                 aria-label={
                   isChatHistoryOpen
@@ -1373,17 +1405,11 @@ function MainApplication() {
                     : "Show chat history"
                 }
               >
-
                 {isChatHistoryOpen ? (
-
                   <ChevronDown size={16} />
-
                 ) : (
-
                   <ChevronRight size={16} />
-
                 )}
-
               </button>
 
             </div>
@@ -1392,7 +1418,6 @@ function MainApplication() {
             {isChatHistoryOpen && (
 
               <div className="chat-history-panel">
-
 
                 <button
                   type="button"
@@ -1407,141 +1432,33 @@ function MainApplication() {
                 {chatHistory.length === 0 ? (
 
                   <div className="chat-history-empty">
-
                     <MessageSquare size={15} />
-
-                    <span>
-                      No saved chats yet.
-                    </span>
-
+                    <span>No saved chats yet.</span>
                   </div>
 
                 ) : (
 
                   <div className="chat-history-list">
-
                     {chatHistory.map((chat) => (
 
-                      <div
+                      <button
                         key={chat.id}
-                        className={`chat-history-row ${
+                        type="button"
+                        className={`chat-history-item ${
                           activeChatId === chat.id
-                            ? "chat-history-row-active"
-                            : ""
-                        } ${
-                          chatMenuId === chat.id
-                            ? "chat-history-row-menu-open"
+                            ? "chat-history-item-active"
                             : ""
                         }`}
+                        onClick={() =>
+                          handleOpenChat(chat)
+                        }
+                        title={chat.title}
                       >
-
-                        <>
-
-                          <button
-                            type="button"
-                            className={`chat-history-item ${
-                              activeChatId === chat.id
-                                ? "chat-history-item-active"
-                                : ""
-                            }`}
-                            onClick={() =>
-                              handleOpenChat(chat)
-                            }
-                            title={chat.title}
-                          >
-
-                            <MessageSquare size={14} />
-
-                            <span>
-                              {chat.title}
-                            </span>
-
-                          </button>
-
-
-                          <div className="chat-history-menu-wrapper">
-
-                            <button
-                              type="button"
-                              className="chat-history-menu-button"
-                              onClick={(event) => {
-
-                                event.stopPropagation();
-
-                                setChatMenuId(
-                                  (currentId) =>
-                                    currentId === chat.id
-                                      ? null
-                                      : chat.id
-                                );
-
-                              }}
-                              aria-label={`Options for ${chat.title}`}
-                              title="Chat options"
-                            >
-
-                              <MoreVertical size={15} />
-
-                            </button>
-
-
-                            {chatMenuId === chat.id && (
-
-                              <div
-                                className="chat-history-menu"
-                                onClick={(event) =>
-                                  event.stopPropagation()
-                                }
-                              >
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleStartRename(
-                                      chat
-                                    )
-                                  }
-                                >
-
-                                  <Pencil size={14} />
-
-                                  <span>
-                                    Rename
-                                  </span>
-
-                                </button>
-
-
-                                <button
-                                  type="button"
-                                  className="chat-history-delete"
-                                  onClick={() =>
-                                    handleDeleteChat(
-                                      chat
-                                    )
-                                  }
-                                >
-
-                                  <Trash2 size={14} />
-
-                                  <span>
-                                    Delete
-                                  </span>
-
-                                </button>
-
-                              </div>
-
-                            )}
-
-                          </div>
-
-                        </>
-
-                      </div>
+                        <MessageSquare size={14} />
+                        <span>{chat.title}</span>
+                      </button>
 
                     ))}
-
                   </div>
 
                 )}
@@ -1551,7 +1468,6 @@ function MainApplication() {
             )}
 
           </div>
-
 
           <NavLink
             to="/overview"
@@ -1609,6 +1525,10 @@ function MainApplication() {
         </nav>
 
 
+        {/* =================================================
+            SIDEBAR FOOTER
+        ================================================= */}
+
         <div className="sidebar-footer">
 
           <span className="sidebar-tagline">
@@ -1621,11 +1541,19 @@ function MainApplication() {
       </aside>
 
 
+      {/* =================================================
+          MAIN CONTENT
+      ================================================= */}
+
       <main className="main-content">
 
 
         <Routes>
 
+
+          {/* =================================================
+              DASHBOARD
+          ================================================= */}
 
           <Route
             path="/dashboard"
@@ -1663,6 +1591,10 @@ function MainApplication() {
           />
 
 
+          {/* =================================================
+              UPLOAD / HISTORY
+          ================================================= */}
+
           <Route
             path="/upload"
             element={
@@ -1695,39 +1627,27 @@ function MainApplication() {
 
             }
           />
+          {/*==============================================
+             AI Chatbot 
+          ==================================================*/}
+          <Route 
+              path="/ai-chatbot"
+               element={
+            <ProtectedRoute>
+            <AIChatbot
+               selectedDataset={selectedDataset}
+               activeChatId={activeChatId}
+               newChatKey={newChatKey}
+               onChatCreated={handleChatCreated}
+           />
+           </ProtectedRoute>
+          }
+           />
 
 
-          <Route
-            path="/ai-chatbot"
-            element={
-
-              <ProtectedRoute>
-
-                <AIChatbot
-
-                  selectedDataset={
-                    selectedDataset
-                  }
-
-                  activeChatId={
-                    activeChatId
-                  }
-
-                  newChatKey={
-                    newChatKey
-                  }
-
-                  onChatCreated={
-                    handleChatCreated
-                  }
-
-                />
-
-              </ProtectedRoute>
-
-            }
-          />
-
+          {/* =================================================
+              OVERVIEW
+          ================================================= */}
 
           <Route
             path="/overview"
@@ -1749,6 +1669,10 @@ function MainApplication() {
           />
 
 
+          {/* =================================================
+              STATISTICS
+          ================================================= */}
+
           <Route
             path="/statistics"
             element={
@@ -1768,6 +1692,10 @@ function MainApplication() {
             }
           />
 
+
+          {/* =================================================
+              VISUALIZATIONS
+          ================================================= */}
 
           <Route
             path="/visualizations"
@@ -1789,6 +1717,10 @@ function MainApplication() {
           />
 
 
+          {/* =================================================
+              AI ANALYSIS
+          ================================================= */}
+
           <Route
             path="/ai-analysis"
             element={
@@ -1808,6 +1740,10 @@ function MainApplication() {
             }
           />
 
+
+          {/* =================================================
+              ANOMALIES
+          ================================================= */}
 
           <Route
             path="/anomalies"
@@ -1829,6 +1765,10 @@ function MainApplication() {
           />
 
 
+          {/* =================================================
+              SETTINGS
+          ================================================= */}
+
           <Route
             path="/settings"
             element={
@@ -1836,6 +1776,10 @@ function MainApplication() {
             }
           />
 
+
+          {/* =================================================
+              DEFAULT APPLICATION ROUTE
+          ================================================= */}
 
           <Route
             path="*"
@@ -1851,164 +1795,6 @@ function MainApplication() {
         </Routes>
 
 
-        {editingChatId && (
-
-          <div
-            className="chat-rename-modal-overlay"
-            role="presentation"
-            onMouseDown={(event) => {
-
-              if (
-                event.target ===
-                event.currentTarget
-              ) {
-
-                handleCancelRename();
-
-              }
-
-            }}
-          >
-
-            <div
-              className="chat-rename-modal"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="chat-rename-modal-title"
-            >
-
-
-              <div className="chat-rename-modal-header">
-
-                <div>
-
-                  <h2 id="chat-rename-modal-title">
-                    Rename Chat
-                  </h2>
-
-                  <p>
-                    Choose a new name for this conversation.
-                  </p>
-
-                </div>
-
-
-                <button
-                  type="button"
-                  className="chat-rename-modal-close"
-                  onClick={handleCancelRename}
-                  aria-label="Close rename dialog"
-                  title="Close"
-                >
-
-                  <X size={18} />
-
-                </button>
-
-              </div>
-
-
-              <div className="chat-rename-modal-body">
-
-                <label htmlFor="chat-rename-input">
-                  Chat name
-                </label>
-
-
-                <input
-                  id="chat-rename-input"
-                  type="text"
-                  value={editingChatTitle}
-                  onChange={(event) =>
-                    setEditingChatTitle(
-                      event.target.value
-                    )
-                  }
-                  onKeyDown={(event) => {
-
-                    if (
-                      event.key === "Enter"
-                    ) {
-
-                      const trimmedTitle =
-                        editingChatTitle.trim();
-
-                      if (trimmedTitle) {
-
-                        handleRenameChat(
-                          editingChatId
-                        );
-
-                      }
-
-                    }
-
-
-                    if (
-                      event.key === "Escape"
-                    ) {
-
-                      handleCancelRename();
-
-                    }
-
-                  }}
-                  maxLength={100}
-                  autoFocus
-                />
-
-
-                <span className="chat-rename-modal-counter">
-                  {editingChatTitle.length}/100
-                </span>
-
-              </div>
-
-
-              <div className="chat-rename-modal-footer">
-
-                <button
-                  type="button"
-                  className="chat-rename-cancel-button"
-                  onClick={handleCancelRename}
-                >
-                  Cancel
-                </button>
-
-
-                <button
-                  type="button"
-                  className="chat-rename-save-button"
-                  onClick={() => {
-
-                    const trimmedTitle =
-                      editingChatTitle.trim();
-
-                    if (trimmedTitle) {
-
-                      handleRenameChat(
-                        editingChatId
-                      );
-
-                    }
-
-                  }}
-                  disabled={
-                    !editingChatTitle.trim()
-                  }
-                >
-                  Save
-                </button>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        )}
-
-
       </main>
 
 
@@ -2019,6 +1805,10 @@ function MainApplication() {
 }
 
 
+/* =========================================================
+   ROOT APP
+   ========================================================= */
+
 function App() {
 
   return (
@@ -2028,16 +1818,16 @@ function App() {
       <Routes>
 
 
+        {/* =================================================
+            STANDALONE AUTHENTICATION
+        ================================================= */}
+
         <Route
           path="/login"
           element={
-
             <AuthRoute>
-
               <Login />
-
             </AuthRoute>
-
           }
         />
 
@@ -2045,27 +1835,23 @@ function App() {
         <Route
           path="/register"
           element={
-
             <AuthRoute>
-
               <Register />
-
             </AuthRoute>
-
           }
         />
 
 
+        {/* =================================================
+            MAIN APPLICATION
+        ================================================= */}
+
         <Route
           path="/*"
           element={
-
             <ProtectedRoute>
-
               <MainApplication />
-
             </ProtectedRoute>
-
           }
         />
 
@@ -2079,4 +1865,4 @@ function App() {
 }
 
 
-export default App;
+export default App; 

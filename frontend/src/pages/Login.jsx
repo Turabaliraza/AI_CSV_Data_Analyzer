@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import csvLogo from "../assets/csv.png";
 
 function Login() {
   const navigate = useNavigate();
@@ -97,17 +98,12 @@ function Login() {
       <div className="auth-card">
 
         <div className="auth-brand">
-
-          <div className="auth-brand-icon">
-            AI
-          </div>
-
-          <div>
-            <h1>CSV Analyzer</h1>
-            <p>Intelligent Data Analysis</p>
-          </div>
-
-        </div>
+        <img
+              src={csvLogo}
+              alt="Vuepoint"
+              className="auth-brand-logo"
+           />
+       </div>
 
 
         <div className="auth-header">
