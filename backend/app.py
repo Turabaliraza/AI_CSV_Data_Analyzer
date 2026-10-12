@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 from bson import ObjectId
-from datetime import datetime,timezone 
+from datetime import datetime, timezone, timedelta
 
 
 # =========================================================
@@ -56,6 +56,7 @@ if not JWT_SECRET_KEY:
     raise RuntimeError("JWT_SECRET_KEY is not configured.")
 
 app.config["JWT_SECRET_KEY"]=JWT_SECRET_KEY
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=3)
 
 jwt=JWTManager(app)
 
@@ -1781,90 +1782,43 @@ Dataset context:
         # Send request to Ollama
         # -------------------------------------------------
 
-        ollama_response = requests.post(
-            "http://localhost:11434/api/chat",
-            json={
-                "model":
-                    "qwen3:4b-instruct-2507-q4_K_M",
-
-                
-
-                "messages":
-                    ollama_messages,
-
-                "think":
-                    False,
-
-                "options": {
-                    "num_predict":
-                        160,
-                    "temperature":
-                        0.2
-                },
-
-                "stream":
-                    False
-            },
-            timeout=120
-        )
-
+        
         # -------------------------------------------------
-        # Check Ollama response
+        # Send request to GroqCloud
         # -------------------------------------------------
 
-        if ollama_response.status_code != 200:
+        from groq import Groq
+
+        groq_client = Groq()
+
+        try:
+            groq_response = groq_client.chat.completions.create(
+                model="openai/gpt-oss-20b",
+                messages=ollama_messages,
+                temperature=0.2,
+                max_completion_tokens=1024,
+                timeout=60
+            )
+
+        except Exception as error:
+            print("GROQ API ERROR:", repr(error))
             return {
-                "error":
-                    "Ollama returned an error.",
-                "details":
-                    ollama_response.text
-            }, 500
-
-        ollama_data = (
-            ollama_response
-            .json()
-        )
+                "error": "The AI service could not complete your request.",
+                "details": str(error)
+            }, 502
 
         # -------------------------------------------------
         # Extract AI response
         # -------------------------------------------------
 
         assistant_message = (
-            ollama_data
-            .get(
-                "message",
-                {}
-            )
-            .get(
-                "content",
-                ""
-            )
-            .strip()
-        )
-
-        # -------------------------------------------------
-        # Remove Qwen thinking/reasoning text
-        # -------------------------------------------------
-
-        if "</think>" in assistant_message:
-            assistant_message = (
-                assistant_message
-                .split("</think>")[-1]
-                .strip()
-            )
-
-        if "<think>" in assistant_message:
-            assistant_message = (
-                assistant_message
-                .replace("<think>", "")
-                .strip()
-            )
+            groq_response.choices[0].message.content or ""
+        ).strip()
 
         if not assistant_message:
             return {
-                "error":
-                    "The AI did not return a response."
-            }, 500
+                "error": "The AI did not return a response."
+            }, 502
 
         # -------------------------------------------------
         # Save chat messages to MongoDB
@@ -1970,17 +1924,13 @@ Dataset context:
                 )
         }, 200
 
-    except requests.exceptions.ConnectionError:
+   
+    except Exception as error:
+        print("CHATBOT ERROR:", repr(error))
         return {
-            "error":
-                "Could not connect to Ollama. Make sure Ollama is running."
-        }, 503
+            "error": "The chatbot request failed. Please try again."
+        }, 500
 
-    except requests.exceptions.Timeout:
-        return {
-            "error":
-                "The AI request timed out. Please try again."
-        }, 504
 
     except Exception as error:
         return {
